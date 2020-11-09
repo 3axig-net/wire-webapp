@@ -17,12 +17,16 @@
  *
  */
 
-import {AssetPayload} from '../entity/message/Asset';
+import type {UserAsset as APIClientUserAsset} from '@wireapp/api-client/src/user';
+import type {Picture as APIClientPicture} from '@wireapp/api-client/src/self';
+
 import {AssetRemoteData} from './AssetRemoteData';
+import type {User} from '../entity/User';
+import type {ServiceEntity} from '../integration/ServiceEntity';
 
 export type MappedAsset = {[index: string]: AssetRemoteData};
 
-export const mapProfileAssets = (userId: string, assets: AssetPayload[]): MappedAsset => {
+export const mapProfileAssets = (userId: string, assets: APIClientUserAsset[]): MappedAsset => {
   const sizeMap: {[index: string]: string} = {
     complete: 'medium',
     preview: 'preview',
@@ -36,7 +40,7 @@ export const mapProfileAssets = (userId: string, assets: AssetPayload[]): Mapped
     }, {});
 };
 
-export const mapProfileAssetsV1 = (userId: string, pictures: AssetPayload[]): MappedAsset => {
+export const mapProfileAssetsV1 = (userId: string, pictures: APIClientPicture[]): MappedAsset => {
   const [previewPicture, mediumPicture] = pictures;
   const previewAsset = previewPicture ? AssetRemoteData.v1(userId, previewPicture.id, true) : undefined;
   const mediumAsset = mediumPicture ? AssetRemoteData.v1(userId, mediumPicture.id, true) : undefined;
@@ -44,8 +48,7 @@ export const mapProfileAssetsV1 = (userId: string, pictures: AssetPayload[]): Ma
   return {medium: mediumAsset, preview: previewAsset};
 };
 
-// TODO: Fake user entity signature until "User" has been converted to TypeScript
-export const updateUserEntityAssets = (userEntity: any, mappedAssets: MappedAsset = {}) => {
+export const updateUserEntityAssets = (userEntity: User | ServiceEntity, mappedAssets: MappedAsset = {}) => {
   const {preview, medium} = mappedAssets;
   if (preview) {
     userEntity.previewPictureResource(preview);

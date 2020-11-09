@@ -17,65 +17,57 @@
  *
  */
 
-import {LoginData, RegisterData} from '@wireapp/api-client/dist/auth';
-import {AppAction} from '.';
-import {RegistrationDataState} from '../../reducer/authReducer';
+import type {SSOSettings} from '@wireapp/api-client/src/account/SSOSettings';
+import type {LoginData, RegisterData} from '@wireapp/api-client/src/auth';
+
+import type {AppAction} from '.';
+import type {RegistrationDataState} from '../../reducer/authReducer';
 
 export enum AUTH_ACTION {
-  LOGIN_START = 'LOGIN_START',
-  LOGIN_SUCCESS = 'LOGIN_SUCCESS',
-  LOGIN_FAILED = 'LOGIN_FAILED',
-
-  SEND_PHONE_LOGIN_CODE_START = 'SEND_PHONE_LOGIN_CODE_START',
-  SEND_PHONE_LOGIN_CODE_SUCCESS = 'SEND_PHONE_LOGIN_CODE_SUCCESS',
-  SEND_PHONE_LOGIN_CODE_FAILED = 'SEND_PHONE_LOGIN_CODE_FAILED',
-
-  REGISTER_PUSH_ACCOUNT_DATA = 'REGISTER_PUSH_ACCOUNT_DATA',
-  REGISTER_RESET_ACCOUNT_DATA = 'REGISTER_RESET_ACCOUNT_DATA',
-
-  PUSH_LOGIN_DATA = 'PUSH_LOGIN_DATA',
-  RESET_LOGIN_DATA = 'RESET_LOGIN_DATA',
-
-  REGISTER_TEAM_START = 'REGISTER_TEAM_START',
-  REGISTER_TEAM_SUCCESS = 'REGISTER_TEAM_SUCCESS',
-  REGISTER_TEAM_FAILED = 'REGISTER_TEAM_FAILED',
-
-  REGISTER_PERSONAL_START = 'REGISTER_PERSONAL_START',
-  REGISTER_PERSONAL_SUCCESS = 'REGISTER_PERSONAL_SUCCESS',
-  REGISTER_PERSONAL_FAILED = 'REGISTER_PERSONAL_FAILED',
-
-  REGISTER_WIRELESS_START = 'REGISTER_WIRELESS_START',
-  REGISTER_WIRELESS_SUCCESS = 'REGISTER_WIRELESS_SUCCESS',
-  REGISTER_WIRELESS_FAILED = 'REGISTER_WIRELESS_FAILED',
-
-  REGISTER_JOIN_START = 'REGISTER_JOIN_START',
-  REGISTER_JOIN_SUCCESS = 'REGISTER_JOIN_SUCCESS',
-  REGISTER_JOIN_FAILED = 'REGISTER_JOIN_FAILED',
-
-  LOGOUT_START = 'LOGOUT_START',
-  LOGOUT_SUCCESS = 'LOGOUT_SUCCESS',
-  LOGOUT_FAILED = 'LOGOUT_FAILED',
-  SILENT_LOGOUT_SUCCESS = 'SILENT_LOGOUT_SUCCESS',
-  SILENT_LOGOUT_FAILED = 'SILENT_LOGOUT_FAILED',
-
-  REFRESH_START = 'REFRESH_START',
-  REFRESH_SUCCESS = 'REFRESH_SUCCESS',
-  REFRESH_FAILED = 'REFRESH_FAILED',
-
-  VALIDATE_LOCAL_CLIENT_START = 'VALIDATE_LOCAL_CLIENT_START',
-  VALIDATE_LOCAL_CLIENT_SUCCESS = 'VALIDATE_LOCAL_CLIENT_SUCCESS',
-  VALIDATE_LOCAL_CLIENT_FAILED = 'VALIDATE_LOCAL_CLIENT_FAILED',
-
+  AUTH_RESET_ERROR = 'AUTH_RESET_ERROR',
+  ENTER_GENERIC_INVITATION_FLOW = 'ENTER_GENERIC_INVITATION_FLOW',
+  ENTER_PERSONAL_CREATION_FLOW = 'ENTER_PERSONAL_CREATION_FLOW',
+  ENTER_PERSONAL_INVITATION_FLOW = 'ENTER_PERSONAL_INVITATION_FLOW',
+  ENTER_TEAM_CREATION_FLOW = 'ENTER_TEAM_CREATION_FLOW',
+  GET_INVITATION_FROM_CODE_FAILED = 'GET_INVITATION_FROM_CODE_FAILED',
   GET_INVITATION_FROM_CODE_START = 'GET_INVITATION_FROM_CODE_START',
   GET_INVITATION_FROM_CODE_SUCCESS = 'GET_INVITATION_FROM_CODE_SUCCESS',
-  GET_INVITATION_FROM_CODE_FAILED = 'GET_INVITATION_FROM_CODE_FAILED',
-
-  AUTH_RESET_ERROR = 'AUTH_RESET_ERROR',
-
-  ENTER_TEAM_CREATION_FLOW = 'ENTER_TEAM_CREATION_FLOW',
-  ENTER_PERSONAL_CREATION_FLOW = 'ENTER_PERSONAL_CREATION_FLOW',
-  ENTER_GENERIC_INVITATION_FLOW = 'ENTER_GENERIC_INVITATION_FLOW',
-  ENTER_PERSONAL_INVITATION_FLOW = 'ENTER_PERSONAL_INVITATION_FLOW',
+  GET_SSO_SETTINGS_FAILED = 'GET_SSO_SETTINGS_FAILED',
+  GET_SSO_SETTINGS_START = 'GET_SSO_SETTINGS_START',
+  GET_SSO_SETTINGS_SUCCESS = 'GET_SSO_SETTINGS_SUCCESS',
+  LOGIN_FAILED = 'LOGIN_FAILED',
+  LOGIN_START = 'LOGIN_START',
+  LOGIN_SUCCESS = 'LOGIN_SUCCESS',
+  LOGOUT_FAILED = 'LOGOUT_FAILED',
+  LOGOUT_START = 'LOGOUT_START',
+  LOGOUT_SUCCESS = 'LOGOUT_SUCCESS',
+  PUSH_LOGIN_DATA = 'PUSH_LOGIN_DATA',
+  REFRESH_FAILED = 'REFRESH_FAILED',
+  REFRESH_START = 'REFRESH_START',
+  REFRESH_SUCCESS = 'REFRESH_SUCCESS',
+  REGISTER_JOIN_FAILED = 'REGISTER_JOIN_FAILED',
+  REGISTER_JOIN_START = 'REGISTER_JOIN_START',
+  REGISTER_JOIN_SUCCESS = 'REGISTER_JOIN_SUCCESS',
+  REGISTER_PERSONAL_FAILED = 'REGISTER_PERSONAL_FAILED',
+  REGISTER_PERSONAL_START = 'REGISTER_PERSONAL_START',
+  REGISTER_PERSONAL_SUCCESS = 'REGISTER_PERSONAL_SUCCESS',
+  REGISTER_PUSH_ACCOUNT_DATA = 'REGISTER_PUSH_ACCOUNT_DATA',
+  REGISTER_RESET_ACCOUNT_DATA = 'REGISTER_RESET_ACCOUNT_DATA',
+  REGISTER_TEAM_FAILED = 'REGISTER_TEAM_FAILED',
+  REGISTER_TEAM_START = 'REGISTER_TEAM_START',
+  REGISTER_TEAM_SUCCESS = 'REGISTER_TEAM_SUCCESS',
+  REGISTER_WIRELESS_FAILED = 'REGISTER_WIRELESS_FAILED',
+  REGISTER_WIRELESS_START = 'REGISTER_WIRELESS_START',
+  REGISTER_WIRELESS_SUCCESS = 'REGISTER_WIRELESS_SUCCESS',
+  RESET_LOGIN_DATA = 'RESET_LOGIN_DATA',
+  SEND_PHONE_LOGIN_CODE_FAILED = 'SEND_PHONE_LOGIN_CODE_FAILED',
+  SEND_PHONE_LOGIN_CODE_START = 'SEND_PHONE_LOGIN_CODE_START',
+  SEND_PHONE_LOGIN_CODE_SUCCESS = 'SEND_PHONE_LOGIN_CODE_SUCCESS',
+  SILENT_LOGOUT_FAILED = 'SILENT_LOGOUT_FAILED',
+  SILENT_LOGOUT_SUCCESS = 'SILENT_LOGOUT_SUCCESS',
+  VALIDATE_LOCAL_CLIENT_FAILED = 'VALIDATE_LOCAL_CLIENT_FAILED',
+  VALIDATE_LOCAL_CLIENT_START = 'VALIDATE_LOCAL_CLIENT_START',
+  VALIDATE_LOCAL_CLIENT_SUCCESS = 'VALIDATE_LOCAL_CLIENT_SUCCESS',
 }
 
 export type AuthActions =
@@ -103,6 +95,9 @@ export type AuthActions =
   | ValidateClientStartAction
   | ValidateClientSuccessAction
   | ValidateClientFailedAction
+  | GetSSOSettingsStartAction
+  | GetSSOSettingsSuccessAction
+  | GetSSOSettingsFailedAction
   | LogoutStartAction
   | LogoutSuccessAction
   | LogoutFailedAction
@@ -124,8 +119,8 @@ export interface LoginSuccessAction extends AppAction {
   readonly type: AUTH_ACTION.LOGIN_SUCCESS;
 }
 export interface LoginFailedAction extends AppAction {
-  readonly type: AUTH_ACTION.LOGIN_FAILED;
   readonly error: Error;
+  readonly type: AUTH_ACTION.LOGIN_FAILED;
 }
 
 export interface SendPhoneLoginCodeStartAction extends AppAction {
@@ -138,8 +133,8 @@ export interface SendPhoneLoginCodeSuccessAction extends AppAction {
   readonly type: AUTH_ACTION.SEND_PHONE_LOGIN_CODE_SUCCESS;
 }
 export interface SendPhoneLoginCodeFailedAction extends AppAction {
-  readonly type: AUTH_ACTION.SEND_PHONE_LOGIN_CODE_FAILED;
   readonly error: Error;
+  readonly type: AUTH_ACTION.SEND_PHONE_LOGIN_CODE_FAILED;
 }
 
 export interface RegisterTeamStartAction extends AppAction {
@@ -150,8 +145,8 @@ export interface RegisterTeamSuccessAction extends AppAction {
   readonly type: AUTH_ACTION.REGISTER_TEAM_SUCCESS;
 }
 export interface RegisterTeamFailedAction extends AppAction {
-  readonly type: AUTH_ACTION.REGISTER_TEAM_FAILED;
   readonly error: Error;
+  readonly type: AUTH_ACTION.REGISTER_TEAM_FAILED;
 }
 
 export interface RegisterPersonalStartAction extends AppAction {
@@ -162,8 +157,8 @@ export interface RegisterPersonalSuccessAction extends AppAction {
   readonly type: AUTH_ACTION.REGISTER_PERSONAL_SUCCESS;
 }
 export interface RegisterPersonalFailedAction extends AppAction {
-  readonly type: AUTH_ACTION.REGISTER_PERSONAL_FAILED;
   readonly error: Error;
+  readonly type: AUTH_ACTION.REGISTER_PERSONAL_FAILED;
 }
 
 export interface RegisterWirelessStartAction extends AppAction {
@@ -174,8 +169,8 @@ export interface RegisterWirelessSuccessAction extends AppAction {
   readonly type: AUTH_ACTION.REGISTER_WIRELESS_SUCCESS;
 }
 export interface RegisterWirelessFailedAction extends AppAction {
-  readonly type: AUTH_ACTION.REGISTER_WIRELESS_FAILED;
   readonly error: Error;
+  readonly type: AUTH_ACTION.REGISTER_WIRELESS_FAILED;
 }
 
 export interface RegisterJoinStartAction extends AppAction {
@@ -186,8 +181,8 @@ export interface RegisterJoinSuccessAction extends AppAction {
   readonly type: AUTH_ACTION.REGISTER_JOIN_SUCCESS;
 }
 export interface RegisterJoinFailedAction extends AppAction {
-  readonly type: AUTH_ACTION.REGISTER_JOIN_FAILED;
   readonly error: Error;
+  readonly type: AUTH_ACTION.REGISTER_JOIN_FAILED;
 }
 
 export interface RefreshStartAction extends AppAction {
@@ -197,8 +192,8 @@ export interface RefreshSuccessAction extends AppAction {
   readonly type: AUTH_ACTION.REFRESH_SUCCESS;
 }
 export interface RefreshFailedAction extends AppAction {
-  readonly type: AUTH_ACTION.REFRESH_FAILED;
   readonly error: Error;
+  readonly type: AUTH_ACTION.REFRESH_FAILED;
 }
 
 export interface ValidateClientStartAction extends AppAction {
@@ -208,8 +203,20 @@ export interface ValidateClientSuccessAction extends AppAction {
   readonly type: AUTH_ACTION.VALIDATE_LOCAL_CLIENT_SUCCESS;
 }
 export interface ValidateClientFailedAction extends AppAction {
-  readonly type: AUTH_ACTION.VALIDATE_LOCAL_CLIENT_FAILED;
   readonly error: Error;
+  readonly type: AUTH_ACTION.VALIDATE_LOCAL_CLIENT_FAILED;
+}
+
+export interface GetSSOSettingsStartAction extends AppAction {
+  readonly type: AUTH_ACTION.GET_SSO_SETTINGS_START;
+}
+export interface GetSSOSettingsSuccessAction extends AppAction {
+  readonly payload: SSOSettings;
+  readonly type: AUTH_ACTION.GET_SSO_SETTINGS_SUCCESS;
+}
+export interface GetSSOSettingsFailedAction extends AppAction {
+  readonly error: Error;
+  readonly type: AUTH_ACTION.GET_SSO_SETTINGS_FAILED;
 }
 
 export interface LogoutStartAction extends AppAction {
@@ -219,16 +226,16 @@ export interface LogoutSuccessAction extends AppAction {
   readonly type: AUTH_ACTION.LOGOUT_SUCCESS;
 }
 export interface LogoutFailedAction extends AppAction {
-  readonly type: AUTH_ACTION.LOGOUT_FAILED;
   readonly error: Error;
+  readonly type: AUTH_ACTION.LOGOUT_FAILED;
 }
 
 export interface LogoutSilentSuccessAction extends AppAction {
   readonly type: AUTH_ACTION.SILENT_LOGOUT_SUCCESS;
 }
 export interface LogoutSilentFailedAction extends AppAction {
-  readonly type: AUTH_ACTION.SILENT_LOGOUT_FAILED;
   readonly error: Error;
+  readonly type: AUTH_ACTION.SILENT_LOGOUT_FAILED;
 }
 
 export interface ResetAuthErrorsAction extends AppAction {
@@ -369,6 +376,20 @@ export class AuthActionCreator {
   static failedValidateLocalClient = (error: Error): ValidateClientFailedAction => ({
     error,
     type: AUTH_ACTION.VALIDATE_LOCAL_CLIENT_FAILED,
+  });
+
+  static startGetSSOSettings = (): GetSSOSettingsStartAction => ({
+    type: AUTH_ACTION.GET_SSO_SETTINGS_START,
+  });
+
+  static successfulGetSSOSettings = (ssoSettings: SSOSettings): GetSSOSettingsSuccessAction => ({
+    payload: ssoSettings,
+    type: AUTH_ACTION.GET_SSO_SETTINGS_SUCCESS,
+  });
+
+  static failedGetSSOSettings = (error: Error): GetSSOSettingsFailedAction => ({
+    error,
+    type: AUTH_ACTION.GET_SSO_SETTINGS_FAILED,
   });
 
   static startLogout = (): LogoutStartAction => ({

@@ -28,7 +28,7 @@ export type MetaData = Asset.AudioMetaData | Asset.VideoMetaData | Asset.ImageMe
 
 /**
  * Constructs corresponding asset meta data depending on the given file type.
- * @param file - the file to generate metadata for
+ * @param file the file to generate metadata for
  * @returns Resolves with ImageMetaData, VideoMetaData or AudioMetaData
  */
 const buildMetadata = (file: File | Blob): Promise<MetaData | void> => {
@@ -60,7 +60,7 @@ const buildMetadataAudio = (audioFile: File | Blob): Promise<Asset.AudioMetaData
     })
     .then(audioBuffer => {
       const durationInMillis = audioBuffer.duration * TIME_IN_MILLIS.SECOND;
-      const normalizedLoudness = normaliseLoudness(audioBuffer);
+      const normalizedLoudness = normalizeLoudness(audioBuffer);
       return new Asset.AudioMetaData({durationInMillis, normalizedLoudness});
     });
 };
@@ -110,7 +110,6 @@ const buildMetadataVideo = (videoFile: File | Blob): Promise<Asset.VideoMetaData
 /**
  * Converts an error event into a plain error object.
  * This needs to be done because error events are not standardized between browser implementations.
- * @private
  * @see https://developer.mozilla.org/en-US/docs/Web/API/Event/originalTarget
  */
 const convertEventToError = (event: any): MediaError => {
@@ -141,7 +140,7 @@ const isVideo = (file: File | Blob): boolean => {
   return file?.type.startsWith('video');
 };
 
-const normaliseLoudness = (audioBuffer: AudioBuffer): Uint8Array => {
+const normalizeLoudness = (audioBuffer: AudioBuffer): Uint8Array => {
   const MAX_SAMPLES = 200;
   const AMPLIFIER = 700; // in favour of iterating all samples before we interpolate them
   const channel = audioBuffer.getChannelData(0);

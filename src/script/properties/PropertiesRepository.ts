@@ -17,26 +17,27 @@
  *
  */
 
+import ko from 'knockout';
+import {amplify} from 'amplify';
+import {Confirmation} from '@wireapp/protocol-messaging';
+import {WebAppEvents} from '@wireapp/webapp-events';
+import {AudioPreference, NotificationPreference, WebappProperties} from '@wireapp/api-client/src/user/data';
+import {ConsentType} from '@wireapp/api-client/src/self';
+
 import {Environment} from 'Util/Environment';
 import {t} from 'Util/LocalizerUtil';
 import {Logger, getLogger} from 'Util/Logger';
 
-import {AudioPreference, NotificationPreference, WebappProperties} from '@wireapp/api-client/dist/user/data';
-import {amplify} from 'amplify';
 import {Config} from '../Config';
-import {ReceiptMode} from '../conversation/ReceiptMode';
-import {User} from '../entity/User';
-import {WebAppEvents} from '../event/WebApp';
-import {SelfService} from '../self/SelfService';
-import {ConsentType} from '../user/ConsentType';
+import type {User} from '../entity/User';
+import type {SelfService} from '../self/SelfService';
 import {ConsentValue} from '../user/ConsentValue';
 import {ModalsViewModel} from '../view_model/ModalsViewModel';
-import {PropertiesService} from './PropertiesService';
+import type {PropertiesService} from './PropertiesService';
 import {PROPERTIES_TYPE} from './PropertiesType';
 
 export class PropertiesRepository {
   // Value names are specified by the protocol but key names can be changed.
-  // tslint:disable-next-line:typedef
   static get CONFIG() {
     return {
       WEBAPP_ACCOUNT_SETTINGS: 'webapp',
@@ -45,15 +46,15 @@ export class PropertiesRepository {
         key: 'WIRE_MARKETING_CONSENT',
       },
       WIRE_RECEIPT_MODE: {
-        defaultValue: ReceiptMode.DELIVERY,
+        defaultValue: Confirmation.Type.DELIVERED,
         key: 'WIRE_RECEIPT_MODE',
       },
     };
   }
 
   private readonly logger: Logger;
-  private readonly propertiesService: PropertiesService;
-  private readonly receiptMode: ko.Observable<any>;
+  public readonly propertiesService: PropertiesService;
+  public readonly receiptMode: ko.Observable<Confirmation.Type>;
   private readonly selfService: SelfService;
   private readonly selfUser: ko.Observable<User>;
   public properties: WebappProperties;
@@ -65,16 +66,18 @@ export class PropertiesRepository {
     this.logger = getLogger('PropertiesRepository');
 
     this.properties = {
-      contact_import: {
-        macos: undefined,
-      },
+      contact_import: {},
       enable_debugging: false,
       settings: {
+        call: {
+          enable_vbr_encoding: true,
+        },
         emoji: {
           replace_inline: true,
         },
         interface: {
           theme: 'default',
+          view_folders: false,
         },
         notifications: NotificationPreference.ON,
         previews: {
@@ -83,6 +86,7 @@ export class PropertiesRepository {
         privacy: {
           improve_wire: undefined,
           report_errors: undefined,
+          telemetry_sharing: undefined,
         },
         sound: {
           alerts: AudioPreference.ALL,
@@ -97,35 +101,51 @@ export class PropertiesRepository {
   }
 
   checkPrivacyPermission(): Promise<void> {
-    const isCheckConsentDisabled = !Config.FEATURE.CHECK_CONSENT;
+    const isCheckConsentDisabled = !Config.getConfig().FEATURE.CHECK_CONSENT;
     const isPrivacyPreferenceSet = this.getPreference(PROPERTIES_TYPE.PRIVACY) !== undefined;
+    const isTelemetryPreferenceSet = this.getPreference(PROPERTIES_TYPE.TELEMETRY_SHARING) !== undefined;
+    const isTeamAccount = this.selfUser().inTeam();
+    const enablePrivacy = () => {
+      this.savePreference(PROPERTIES_TYPE.PRIVACY, true);
+      this.publishProperties();
+    };
 
-    return isCheckConsentDisabled || isPrivacyPreferenceSet
-      ? Promise.resolve()
-      : new Promise(resolve => {
-          amplify.publish(WebAppEvents.WARNING.MODAL, ModalsViewModel.TYPE.CONFIRM, {
-            preventClose: true,
-            primaryAction: {
-              action: () => {
-                this.savePreference(PROPERTIES_TYPE.PRIVACY, true);
-                this.publishProperties();
-                resolve();
-              },
-              text: t('modalImproveWireAction'),
-            },
-            secondaryAction: {
-              action: () => {
-                this.savePreference(PROPERTIES_TYPE.PRIVACY, false);
-                resolve();
-              },
-              text: t('modalImproveWireSecondary'),
-            },
-            text: {
-              message: t('modalImproveWireMessage', Config.BRAND_NAME),
-              title: t('modalImproveWireHeadline', Config.BRAND_NAME),
-            },
-          });
-        });
+    if (!isTelemetryPreferenceSet && isTeamAccount) {
+      this.savePreference(PROPERTIES_TYPE.TELEMETRY_SHARING, true);
+      this.publishProperties();
+    }
+
+    if (isCheckConsentDisabled || isPrivacyPreferenceSet) {
+      return Promise.resolve();
+    }
+
+    if (isTeamAccount) {
+      return Promise.resolve();
+    }
+
+    return new Promise(resolve => {
+      amplify.publish(WebAppEvents.WARNING.MODAL, ModalsViewModel.TYPE.CONFIRM, {
+        preventClose: true,
+        primaryAction: {
+          action: () => {
+            enablePrivacy();
+            resolve();
+          },
+          text: t('modalImproveWireAction'),
+        },
+        secondaryAction: {
+          action: () => {
+            this.savePreference(PROPERTIES_TYPE.PRIVACY, false);
+            resolve();
+          },
+          text: t('modalImproveWireSecondary'),
+        },
+        text: {
+          message: t('modalImproveWireMessage', Config.getConfig().BRAND_NAME),
+          title: t('modalImproveWireHeadline', Config.getConfig().BRAND_NAME),
+        },
+      });
+    });
   }
 
   getPreference(propertiesType: string): any {
@@ -195,17 +215,7 @@ export class PropertiesRepository {
     return this.properties;
   }
 
-  savePreference(propertiesType: string, updatedPreference: any): void {
-    if (updatedPreference === undefined) {
-      switch (propertiesType) {
-        case PROPERTIES_TYPE.CONTACT_IMPORT.MACOS:
-          updatedPreference = Date.now();
-          break;
-        default:
-          updatedPreference = true;
-      }
-    }
-
+  savePreference(propertiesType: string, updatedPreference: any = true): void {
     if (updatedPreference !== this.getPreference(propertiesType)) {
       this.setPreference(propertiesType, updatedPreference);
 
@@ -220,7 +230,7 @@ export class PropertiesRepository {
   deleteProperty(key: string): void {
     switch (key) {
       case PropertiesRepository.CONFIG.WIRE_RECEIPT_MODE.key:
-        this.setProperty(key, ReceiptMode.DELIVERY);
+        this.setProperty(key, Confirmation.Type.DELIVERED);
         break;
       case PropertiesRepository.CONFIG.WIRE_MARKETING_CONSENT.key:
         this.setProperty(key, ConsentValue.NOT_GIVEN);
@@ -250,7 +260,7 @@ export class PropertiesRepository {
   updateProperty(key: string, value: any): Promise<void> | void {
     switch (key) {
       case PropertiesRepository.CONFIG.WIRE_RECEIPT_MODE.key:
-        if (value === ReceiptMode.DELIVERY) {
+        if (value === Confirmation.Type.DELIVERED) {
           return this.propertiesService.deletePropertiesByKey(key);
         }
         return this.propertiesService.putPropertiesByKey(key, value);
@@ -271,7 +281,7 @@ export class PropertiesRepository {
   private savePreferenceActivatedAccount(propertiesType: string, updatedPreference: any): Promise<void> {
     return this.propertiesService
       .putPropertiesByKey(PropertiesRepository.CONFIG.WEBAPP_ACCOUNT_SETTINGS, this.properties)
-      .then(() => this.logger.info(`Saved updated preference: '${propertiesType}' - '${updatedPreference}'`));
+      .then(() => this.logger.info(`Saved updated preference "${propertiesType}": ${updatedPreference}`));
   }
 
   private savePreferenceTemporaryGuestAccount(propertiesType: string, updatedPreference: any): Promise<void> {
@@ -281,11 +291,11 @@ export class PropertiesRepository {
 
   private publishPropertyUpdate(propertiesType: string, updatedPreference: any): void {
     switch (propertiesType) {
-      case PROPERTIES_TYPE.CONTACT_IMPORT.MACOS:
-        amplify.publish(WebAppEvents.PROPERTIES.UPDATE.CONTACTS, updatedPreference);
-        break;
       case PROPERTIES_TYPE.INTERFACE.THEME:
         amplify.publish(WebAppEvents.PROPERTIES.UPDATE.INTERFACE.THEME, updatedPreference);
+        break;
+      case PROPERTIES_TYPE.INTERFACE.VIEW_FOLDERS:
+        amplify.publish(WebAppEvents.PROPERTIES.UPDATE.INTERFACE.VIEW_FOLDERS, updatedPreference);
         break;
       case PROPERTIES_TYPE.EMOJI.REPLACE_INLINE:
         amplify.publish(WebAppEvents.PROPERTIES.UPDATE.EMOJI.REPLACE_INLINE, updatedPreference);
@@ -302,8 +312,14 @@ export class PropertiesRepository {
       case PROPERTIES_TYPE.PRIVACY:
         amplify.publish(WebAppEvents.PROPERTIES.UPDATE.PRIVACY, updatedPreference);
         break;
+      case PROPERTIES_TYPE.TELEMETRY_SHARING:
+        amplify.publish(WebAppEvents.PROPERTIES.UPDATE.TELEMETRY_SHARING, updatedPreference);
+        break;
       case PROPERTIES_TYPE.SOUND_ALERTS:
         amplify.publish(WebAppEvents.PROPERTIES.UPDATE.SOUND_ALERTS, updatedPreference);
+        break;
+      case PROPERTIES_TYPE.CALL.ENABLE_VBR_ENCODING:
+        amplify.publish(WebAppEvents.PROPERTIES.UPDATE.CALL.ENABLE_VBR_ENCODING, updatedPreference);
         break;
       default:
         throw new Error(`Failed to update preference of unhandled type '${propertiesType}'`);

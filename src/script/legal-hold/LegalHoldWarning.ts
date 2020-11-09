@@ -18,15 +18,21 @@
  */
 
 import {amplify} from 'amplify';
+import {WebAppEvents} from '@wireapp/webapp-events';
+
 import {t} from 'Util/LocalizerUtil';
+
 import {ConversationVerificationState} from '../conversation/ConversationVerificationState';
-import {Conversation} from '../entity/Conversation';
-import {WebAppEvents} from '../event/WebApp';
+import type {Conversation} from '../entity/Conversation';
 import {SHOW_LEGAL_HOLD_MODAL} from '../view_model/content/LegalHoldModalViewModel';
 import {ModalsViewModel} from '../view_model/ModalsViewModel';
 import {OPEN_CONVERSATION_DETAILS} from '../view_model/PanelViewModel';
+import {ConversationError} from '../error/ConversationError';
 
-export const showLegalHoldWarning = (conversationEntity: Conversation, verifyDevices: boolean = false) => {
+export const showLegalHoldWarning = (
+  conversationEntity: Conversation,
+  verifyDevices: boolean = false,
+): Promise<boolean> => {
   return new Promise((resolve, reject) => {
     const secondaryAction = [
       {
@@ -42,8 +48,12 @@ export const showLegalHoldWarning = (conversationEntity: Conversation, verifyDev
     }
     amplify.publish(WebAppEvents.WARNING.MODAL, ModalsViewModel.TYPE.MULTI_ACTIONS, {
       close: () => {
-        const errorType = z.error.ConversationError.TYPE.LEGAL_HOLD_CONVERSATION_CANCELLATION;
-        reject(new z.error.ConversationError(errorType));
+        reject(
+          new ConversationError(
+            ConversationError.TYPE.LEGAL_HOLD_CONVERSATION_CANCELLATION,
+            ConversationError.MESSAGE.LEGAL_HOLD_CONVERSATION_CANCELLATION,
+          ),
+        );
       },
       preventClose: true,
       primaryAction: {

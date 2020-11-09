@@ -17,29 +17,31 @@
  *
  */
 
-import {CALL_TYPE} from '@wireapp/avs';
+import {CALL_TYPE, CONV_TYPE} from '@wireapp/avs';
+import {WebAppEvents} from '@wireapp/webapp-events';
 import {amplify} from 'amplify';
 import ko from 'knockout';
-import {TIME_IN_MILLIS, formatSeconds} from 'Util/TimeUtil';
-import {Call} from '../../calling/Call';
-import {Grid} from '../../calling/videoGridHandler';
-import {Conversation} from '../../entity/Conversation';
-import {ElectronDesktopCapturerSource, MediaDevicesHandler} from '../../media/MediaDevicesHandler';
 
-import {WebAppEvents} from '../../event/WebApp';
+import {TIME_IN_MILLIS, formatSeconds} from 'Util/TimeUtil';
+import type {Call} from '../../calling/Call';
+import type {Grid} from '../../calling/videoGridHandler';
+import type {Conversation} from '../../entity/Conversation';
+import type {ElectronDesktopCapturerSource, MediaDevicesHandler} from '../../media/MediaDevicesHandler';
+import type {CallActions} from '../../view_model/CallingViewModel';
+import type {Multitasking} from '../../notification/NotificationRepository';
 
 import 'Components/calling/deviceToggleButton';
 
 interface Params {
-  videoGrid: ko.Observable<Grid>;
   call: Call;
-  conversation: ko.Observable<Conversation>;
-  mediaDevicesHandler: MediaDevicesHandler;
-  multitasking: any;
+  callActions: CallActions;
   canShareScreen: boolean;
-  callActions: any;
-  isMuted: ko.Observable<boolean>;
+  conversation: ko.Observable<Conversation>;
   isChoosingScreen: ko.Observable<boolean>;
+  isMuted: ko.Observable<boolean>;
+  mediaDevicesHandler: MediaDevicesHandler;
+  multitasking: Multitasking;
+  videoGrid: ko.Observable<Grid>;
 }
 
 export class FullscreenVideoCalling {
@@ -47,9 +49,9 @@ export class FullscreenVideoCalling {
   public call: Call;
   public conversation: ko.Observable<Conversation>;
   public mediaDevicesHandler: MediaDevicesHandler;
-  public multitasking: any;
+  public multitasking: Multitasking;
   public canShareScreen: boolean;
-  public callActions: any;
+  public callActions: CallActions;
   public isMuted: ko.Observable<boolean>;
   public isChoosingScreen: ko.Observable<boolean>;
 
@@ -61,7 +63,6 @@ export class FullscreenVideoCalling {
   public availableCameras: ko.PureComputed<string[]>;
   public availableScreens: ko.PureComputed<string[]>;
   public showSwitchCamera: ko.PureComputed<boolean>;
-  public showSwitchScreen: ko.PureComputed<boolean>;
 
   public hasUnreadMessages: ko.Observable<boolean>;
 
@@ -71,7 +72,6 @@ export class FullscreenVideoCalling {
   public HIDE_CONTROLS_TIMEOUT: number;
   public dispose: () => void;
 
-  // tslint:disable-next-line:typedef
   static get CONFIG() {
     return {
       AUTO_MINIMIZE_TIMEOUT: TIME_IN_MILLIS.SECOND * 4,
@@ -102,8 +102,8 @@ export class FullscreenVideoCalling {
     this.HIDE_CONTROLS_TIMEOUT = FullscreenVideoCalling.CONFIG.HIDE_CONTROLS_TIMEOUT;
 
     this.canShareScreen = canShareScreen;
-    this.selfSharesScreen = call.selfParticipant.sharesScreen;
-    this.selfSharesCamera = call.selfParticipant.sharesCamera;
+    this.selfSharesScreen = call.getSelfParticipant().sharesScreen;
+    this.selfSharesCamera = call.getSelfParticipant().sharesCamera;
     this.currentCameraDevice = mediaDevicesHandler.currentDeviceId.videoInput;
     this.currentScreenDevice = mediaDevicesHandler.currentDeviceId.screenInput;
 
@@ -120,12 +120,12 @@ export class FullscreenVideoCalling {
     this.showSwitchCamera = ko.pureComputed(() => {
       return this.selfSharesCamera() && this.availableCameras().length > 1;
     });
-    this.showSwitchScreen = ko.pureComputed(() => {
-      return this.selfSharesScreen() && this.availableScreens().length > 1;
-    });
 
     this.showToggleVideo = ko.pureComputed(() => {
-      return this.call.initialType === CALL_TYPE.VIDEO || conversation().supportsVideoCall(true);
+      return (
+        this.call.initialType === CALL_TYPE.VIDEO ||
+        conversation().supportsVideoCall(call.conversationType === CONV_TYPE.CONFERENCE)
+      );
     });
 
     this.callDuration = ko.observable();
@@ -188,7 +188,7 @@ ko.components.register('fullscreen-video-call', {
   template: `
 <div id="video-calling" data-bind="hide_controls: {timeout: HIDE_CONTROLS_TIMEOUT, skipClass: 'video-controls__button'}" class="video-calling">
   <div id="video-element-remote" class="video-element-remote">
-    <group-video-grid params="grid: videoGrid, muted: isMuted, selfUserId: call.selfParticipant.userId"></group-video-grid>
+    <group-video-grid params="grid: videoGrid, muted: isMuted, selfParticipant: call.getSelfParticipant()"></group-video-grid>
   </div>
 
   <!-- ko if: !isChoosingScreen() -->
@@ -219,7 +219,7 @@ ko.components.register('fullscreen-video-call', {
         <div class="video-controls__button"
             data-bind="click: () => callActions.toggleMute(call, !isMuted()), css: {'video-controls__button--active': isMuted()}, attr: {'data-uie-value': !isMuted() ? 'inactive' : 'active'}"
             data-uie-name="do-call-controls-video-call-mute">
-          <micoff-icon></micoff-icon>
+          <mic-off-icon></mic-off-icon>
           <div class="video-controls__button__label" data-bind="text: t('videoCallOverlayMute')"></div>
         </div>
 
@@ -246,13 +246,7 @@ ko.components.register('fullscreen-video-call', {
               attr: {'data-uie-value': selfSharesScreen() ? 'active' : 'inactive', 'data-uie-enabled': canShareScreen ? 'true' : 'false'}"
             data-uie-name="do-toggle-screen">
           <screenshare-icon></screenshare-icon>
-          <!-- ko if: showSwitchScreen() -->
-            <device-toggle-button params="currentDevice: currentScreenDevice, devices: availableScreens, onChooseDevice: deviceId => switchScreenSource(call, deviceId)">
-            </device-toggle-button>
-          <!-- /ko -->
-          <!-- ko ifnot: showSwitchScreen() -->
-            <div class="video-controls__button__label" data-bind="text: t('videoCallOverlayShareScreen')"></div>
-          <!-- /ko -->
+          <div class="video-controls__button__label" data-bind="text: t('videoCallOverlayShareScreen')"></div>
         </div>
 
         <div class="video-controls__button video-controls__button--red" data-bind="click: () => callActions.leave(call)" data-uie-name="do-call-controls-video-call-cancel">

@@ -17,12 +17,13 @@
  *
  */
 
-import {ParticipantAvatar} from 'Components/participantAvatar';
-import {ServiceEntity} from '../../integration/ServiceEntity';
+import ko from 'knockout';
+import {AVATAR_SIZE} from 'Components/ParticipantAvatar';
+import type {ServiceEntity} from '../../integration/ServiceEntity';
 
 interface ComponentParams {
+  AVATAR_SIZE: AVATAR_SIZE;
   service: ServiceEntity;
-  participantAvatar: ParticipantAvatar;
 }
 
 ko.components.register('panel-service-details', {
@@ -30,17 +31,17 @@ ko.components.register('panel-service-details', {
     <div class="panel-participant">
       <div class="panel-participant__name" data-bind="text: service().name" data-uie-name="status-service-name"></div>
       <div class="panel-participant__provider-name" data-bind="text: service().providerName()" data-uie-name="status-service-provider"></div>
-      <participant-avatar params="participant: service, size: ParticipantAvatar.SIZE.X_LARGE" data-uie-name="status-profile-picture"></participant-avatar>
+      <participant-avatar params="participant: service, size: AVATAR_SIZE.X_LARGE" data-uie-name="status-profile-picture"></participant-avatar>
       <div class="panel-participant__service-description" data-bind="text: service().description" data-uie-name="status-service-description"></div>
     </div>
   `,
   viewModel: class {
     readonly service: ServiceEntity;
-    readonly ParticipantAvatar: typeof ParticipantAvatar;
+    readonly AVATAR_SIZE: typeof AVATAR_SIZE;
 
     constructor(params: ComponentParams) {
       this.service = params.service;
-      this.ParticipantAvatar = ParticipantAvatar;
+      this.AVATAR_SIZE = AVATAR_SIZE;
     }
   },
 });

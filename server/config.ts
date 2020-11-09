@@ -19,10 +19,12 @@
 
 import * as dotenv from 'dotenv-extended';
 import * as fs from 'fs-extra';
-import {IHelmetContentSecurityPolicyDirectives as HelmetCSP} from 'helmet';
+import {ContentSecurityPolicyOptions} from 'helmet/dist/middlewares/content-security-policy';
 import * as logdown from 'logdown';
 import * as path from 'path';
-import {ServerConfig} from './ServerConfig';
+
+import type {ServerConfig} from './ServerConfig';
+type ContentSecurityPolicyDirectives = ContentSecurityPolicyOptions['directives'];
 
 const nodeEnvironment = process.env.NODE_ENV || 'production';
 
@@ -34,7 +36,7 @@ const VERSION_FILE = path.join(__dirname, 'version');
 
 dotenv.load();
 
-const defaultCSP: HelmetCSP = {
+const defaultCSP: ContentSecurityPolicyDirectives = {
   connectSrc: [
     "'self'",
     'blob:',
@@ -93,8 +95,8 @@ function parseCommaSeparatedList(list: string = ''): string[] {
   return cleanedList.split(',');
 }
 
-function mergedCSP(): HelmetCSP {
-  const csp: HelmetCSP = {
+function mergedCSP(): ContentSecurityPolicyDirectives {
+  const csp: ContentSecurityPolicyDirectives = {
     connectSrc: [
       ...defaultCSP.connectSrc,
       process.env.BACKEND_REST,
@@ -114,7 +116,7 @@ function mergedCSP(): HelmetCSP {
     workerSrc: [...defaultCSP.workerSrc, ...parseCommaSeparatedList(process.env.CSP_EXTRA_WORKER_SRC)],
   };
   return Object.entries(csp)
-    .filter(([key, value]) => !!value.length)
+    .filter(([key, value]) => !!Array.from(value).length)
     .reduce((accumulator, [key, value]) => ({...accumulator, [key]: value}), {});
 }
 
@@ -122,9 +124,12 @@ const config: ServerConfig = {
   CLIENT: {
     ANALYTICS_API_KEY: process.env.ANALYTICS_API_KEY,
     APP_NAME: process.env.APP_NAME,
+    BACKEND_NAME: process.env.BACKEND_NAME,
     BACKEND_REST: process.env.BACKEND_REST,
     BACKEND_WS: process.env.BACKEND_WS,
     BRAND_NAME: process.env.BRAND_NAME,
+    CHROME_ORIGIN_TRIAL_TOKEN: process.env.CHROME_ORIGIN_TRIAL_TOKEN,
+    COUNTLY_API_KEY: process.env.COUNTLY_API_KEY,
     ENVIRONMENT: nodeEnvironment,
     FEATURE: {
       ALLOWED_FILE_UPLOAD_EXTENSIONS: (process.env.FEATURE_ALLOWED_FILE_UPLOAD_EXTENSIONS || '*')
@@ -136,31 +141,49 @@ const config: ServerConfig = {
       APPLOCK_UNFOCUS_TIMEOUT: process.env.FEATURE_APPLOCK_UNFOCUS_TIMEOUT
         ? Number(process.env.FEATURE_APPLOCK_UNFOCUS_TIMEOUT)
         : null,
-      CHECK_CONSENT: process.env.FEATURE_CHECK_CONSENT == 'false' ? false : true,
-      DEFAULT_LOGIN_TEMPORARY_CLIENT: process.env.FEATURE_DEFAULT_LOGIN_TEMPORARY_CLIENT == 'true' ? true : false,
-      ENABLE_ACCOUNT_REGISTRATION: process.env.FEATURE_ENABLE_ACCOUNT_REGISTRATION == 'false' ? false : true,
-      ENABLE_DEBUG: process.env.FEATURE_ENABLE_DEBUG == 'true' ? true : false,
-      ENABLE_PHONE_LOGIN: process.env.FEATURE_ENABLE_PHONE_LOGIN == 'false' ? false : true,
-      ENABLE_SSO: process.env.FEATURE_ENABLE_SSO == 'true' ? true : false,
-      PERSIST_TEMPORARY_CLIENTS: process.env.FEATURE_PERSIST_TEMPORARY_CLIENTS == 'false' ? false : true,
-      SHOW_LOADING_INFORMATION: process.env.FEATURE_SHOW_LOADING_INFORMATION == 'true' ? true : false,
+      CHECK_CONSENT: process.env.FEATURE_CHECK_CONSENT != 'false',
+      CONFERENCE_AUTO_MUTE: process.env.FEATURE_CONFERENCE_AUTO_MUTE == 'true',
+      DEFAULT_LOGIN_TEMPORARY_CLIENT: process.env.FEATURE_DEFAULT_LOGIN_TEMPORARY_CLIENT == 'true',
+      ENABLE_ACCOUNT_REGISTRATION: process.env.FEATURE_ENABLE_ACCOUNT_REGISTRATION != 'false',
+      ENABLE_ACCOUNT_REGISTRATION_ACCEPT_TERMS_AND_PRIVACY_POLICY:
+        process.env.FEATURE_ENABLE_ACCOUNT_REGISTRATION_ACCEPT_TERMS_AND_PRIVACY_POLICY == 'true',
+      ENABLE_DEBUG: process.env.FEATURE_ENABLE_DEBUG == 'true',
+      ENABLE_DOMAIN_DISCOVERY: process.env.FEATURE_ENABLE_DOMAIN_DISCOVERY != 'false',
+      ENABLE_PHONE_LOGIN: process.env.FEATURE_ENABLE_PHONE_LOGIN != 'false',
+      ENABLE_SSO: process.env.FEATURE_ENABLE_SSO == 'true',
+      PERSIST_TEMPORARY_CLIENTS: process.env.FEATURE_PERSIST_TEMPORARY_CLIENTS != 'false',
+      SHOW_LOADING_INFORMATION: process.env.FEATURE_SHOW_LOADING_INFORMATION == 'true',
     },
     MAX_GROUP_PARTICIPANTS: (process.env.MAX_GROUP_PARTICIPANTS && Number(process.env.MAX_GROUP_PARTICIPANTS)) || 500,
     MAX_VIDEO_PARTICIPANTS: (process.env.MAX_VIDEO_PARTICIPANTS && Number(process.env.MAX_VIDEO_PARTICIPANTS)) || 4,
     NEW_PASSWORD_MINIMUM_LENGTH:
       (process.env.NEW_PASSWORD_MINIMUM_LENGTH && Number(process.env.NEW_PASSWORD_MINIMUM_LENGTH)) || 8,
-    RAYGUN_API_KEY: process.env.RAYGUN_API_KEY,
     URL: {
       ACCOUNT_BASE: process.env.URL_ACCOUNT_BASE,
       MOBILE_BASE: process.env.URL_MOBILE_BASE,
       PRIVACY_POLICY: process.env.URL_PRIVACY_POLICY,
-      SUPPORT_BASE: process.env.URL_SUPPORT_BASE,
+      SUPPORT: {
+        BUG_REPORT: process.env.URL_SUPPORT_BUG_REPORT,
+        CALLING: process.env.URL_SUPPORT_CALLING,
+        CAMERA_ACCESS_DENIED: process.env.URL_SUPPORT_CAMERA_ACCESS_DENIED,
+        CONTACT: process.env.URL_SUPPORT_CONTACT,
+        DEVICE_ACCESS_DENIED: process.env.URL_SUPPORT_DEVICE_ACCESS_DENIED,
+        DEVICE_NOT_FOUND: process.env.URL_SUPPORT_DEVICE_NOT_FOUND,
+        EMAIL_EXISTS: process.env.URL_SUPPORT_EMAIL_EXISTS,
+        HISTORY: process.env.URL_SUPPORT_HISTORY,
+        INDEX: process.env.URL_SUPPORT_INDEX,
+        MICROPHONE_ACCESS_DENIED: process.env.URL_SUPPORT_MICROPHONE_ACCESS_DENIED,
+        SCREEN_ACCESS_DENIED: process.env.URL_SUPPORT_SCREEN_ACCESS_DENIED,
+      },
       TEAMS_BASE: process.env.URL_TEAMS_BASE,
+      TEAMS_CREATE: process.env.URL_TEAMS_CREATE,
       TERMS_OF_USE_PERSONAL: process.env.URL_TERMS_OF_USE_PERSONAL,
       TERMS_OF_USE_TEAMS: process.env.URL_TERMS_OF_USE_TEAMS,
       WEBSITE_BASE: process.env.URL_WEBSITE_BASE,
+      WHATS_NEW: process.env.URL_WHATS_NEW,
     },
     VERSION: readFile(VERSION_FILE, '0.0.0'),
+    WEBSITE_LABEL: process.env.WEBSITE_LABEL,
   },
   COMMIT: readFile(COMMIT_FILE, ''),
   SERVER: {
@@ -168,15 +191,23 @@ const config: ServerConfig = {
     CACHE_DURATION_SECONDS: 300,
     CSP: mergedCSP(),
     DEVELOPMENT: nodeEnvironment === 'development',
-    ENFORCE_HTTPS: process.env.ENFORCE_HTTPS == 'false' ? false : true,
+    ENFORCE_HTTPS: process.env.ENFORCE_HTTPS != 'false',
     ENVIRONMENT: nodeEnvironment,
     GOOGLE_WEBMASTER_ID: process.env.GOOGLE_WEBMASTER_ID,
+    OPEN_GRAPH: {
+      DESCRIPTION: process.env.OPEN_GRAPH_DESCRIPTION,
+      IMAGE_URL: process.env.OPEN_GRAPH_IMAGE_URL,
+      TITLE: process.env.OPEN_GRAPH_TITLE,
+    },
     PORT_HTTP: Number(process.env.PORT) || 21080,
     ROBOTS: {
       ALLOW: readFile(ROBOTS_ALLOW_FILE, 'User-agent: *\r\nDisallow: /'),
       ALLOWED_HOSTS: ['app.wire.com'],
       DISALLOW: readFile(ROBOTS_DISALLOW_FILE, 'User-agent: *\r\nDisallow: /'),
     },
+    SSL_CERTIFICATE_KEY_PATH:
+      process.env.SSL_CERTIFICATE_KEY_PATH || path.join(__dirname, 'certificate/development-key.pem'),
+    SSL_CERTIFICATE_PATH: process.env.SSL_CERTIFICATE_PATH || path.join(__dirname, 'certificate/development-cert.pem'),
   },
 };
 

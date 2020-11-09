@@ -18,6 +18,7 @@
  */
 
 import {Availability} from '@wireapp/protocol-messaging';
+
 import {t} from 'Util/LocalizerUtil';
 import {loadValue, storeValue} from 'Util/StorageUtil';
 
@@ -28,6 +29,7 @@ const initialKey = 'hide_initial_modal';
 function showModal(storageKey: string, title: string, message: string): void {
   const hideModal = loadValue(storageKey);
   if (!hideModal) {
+    /* cspell:disable */
     modals.showModal(
       ModalsViewModel.TYPE.OPTION,
       {
@@ -49,6 +51,7 @@ function showModal(storageKey: string, title: string, message: string): void {
       },
       'availability',
     );
+    /* cspell:enable */
   }
 }
 

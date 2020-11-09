@@ -18,6 +18,7 @@
  */
 
 import ko from 'knockout';
+
 import {instantiateComponent} from '../../../../test/helper/knockoutHelpers';
 import './deviceToggleButton';
 
@@ -32,8 +33,10 @@ describe('deviceToggleButton', () => {
 
     return instantiateComponent('device-toggle-button', params).then((domContainer: Element) => {
       const dots = domContainer.querySelectorAll('.device-toggle-button-indicator-dot');
+
       expect(dots.length).toBe(devices.length);
       const activeDot = domContainer.querySelector('.device-toggle-button-indicator-dot-active');
+
       expect(activeDot).not.toBe(null);
     });
   });
@@ -52,6 +55,7 @@ describe('deviceToggleButton', () => {
         fail('button was not found');
       }
       button.click();
+
       expect(params.onChooseDevice).toHaveBeenCalled();
     });
   });

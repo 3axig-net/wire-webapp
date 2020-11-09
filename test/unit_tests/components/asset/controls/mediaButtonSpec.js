@@ -37,22 +37,16 @@ describe('media-button', () => {
   };
 
   it('displays the media buttons if the media is uploaded', () => {
-    const params = Object.assign({}, defaultParams, {
-      transferState: ko.observable(AssetTransferState.UPLOADED),
-    });
+    const params = {...defaultParams, transferState: ko.observable(AssetTransferState.UPLOADED)};
     spyOn(params, 'play');
     spyOn(params, 'pause');
     return instantiateComponent('media-button', params).then(domContainer => {
       const playButton = domContainer.querySelector('[data-uie-name=do-play-media]');
       const pauseButton = domContainer.querySelector('[data-uie-name=do-pause-media]');
 
-      expect(playButton.style.display)
-        .withContext('play button style')
-        .toBe('');
+      expect(playButton.style.display).withContext('play button style').toBe('');
 
-      expect(pauseButton.style.display)
-        .withContext('pause button style')
-        .toBe('none');
+      expect(pauseButton.style.display).withContext('pause button style').toBe('none');
 
       playButton.click();
 
@@ -75,30 +69,22 @@ describe('media-button', () => {
   });
 
   it('displays a loader if the media is being downloaded', () => {
-    const params = Object.assign({}, defaultParams, {
-      transferState: ko.observable(AssetTransferState.DOWNLOADING),
-    });
+    const params = {...defaultParams, transferState: ko.observable(AssetTransferState.DOWNLOADING)};
 
     return instantiateComponent('media-button', params).then(domContainer => {
       const playButton = domContainer.querySelector('[data-uie-name=do-play-media]');
       const pauseButton = domContainer.querySelector('[data-uie-name=do-pause-media]');
 
-      expect(playButton)
-        .withContext('play button')
-        .toBe(null);
+      expect(playButton).withContext('play button').toBe(null);
 
-      expect(pauseButton)
-        .withContext('pause button')
-        .toBe(null);
+      expect(pauseButton).withContext('pause button').toBe(null);
 
       expect(domContainer.querySelector('asset-loader')).not.toBe(null);
     });
   });
 
   it('displays a loader if the media is being uploaded', () => {
-    const params = Object.assign({}, defaultParams, {
-      transferState: ko.observable(AssetTransferState.UPLOADING),
-    });
+    const params = {...defaultParams, transferState: ko.observable(AssetTransferState.UPLOADING)};
 
     spyOn(params, 'cancel');
 

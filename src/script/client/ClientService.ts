@@ -17,16 +17,17 @@
  *
  */
 
+import type {NewClient, PublicClient, RegisteredClient} from '@wireapp/api-client/src/client';
+import {container} from 'tsyringe';
+
 import {Logger, getLogger} from 'Util/Logger';
 
-import {NewClient, PublicClient, RegisteredClient} from '@wireapp/api-client/dist/client';
-import {BackendClient} from '../service/BackendClient';
+import type {ClientRecord} from '../storage';
 import {StorageService} from '../storage';
 import {StorageSchemata} from '../storage/StorageSchemata';
+import {APIClient} from '../service/APIClientSingleton';
 
 export class ClientService {
-  private readonly backendClient: BackendClient;
-  private readonly storageService: StorageService;
   private readonly logger: Logger;
   private readonly CLIENT_STORE_NAME: string;
 
@@ -38,13 +39,10 @@ export class ClientService {
     return '/users';
   }
 
-  /**
-   * @param backendClient Client for the API calls
-   * @param storageService Service for all storage interactions
-   */
-  constructor(backendClient: BackendClient, storageService: StorageService) {
-    this.backendClient = backendClient;
-    this.storageService = storageService;
+  constructor(
+    private readonly storageService = container.resolve(StorageService),
+    private readonly apiClient = container.resolve(APIClient),
+  ) {
     this.logger = getLogger('ClientService');
 
     this.CLIENT_STORE_NAME = StorageSchemata.OBJECT_STORE.CLIENTS;
@@ -63,13 +61,7 @@ export class ClientService {
    * @returns Resolves once the deletion of the client is complete
    */
   deleteClient(clientId: string, password: string): Promise<void> {
-    return this.backendClient.sendJson({
-      data: {
-        password,
-      },
-      type: 'DELETE',
-      url: `${ClientService.URL_CLIENTS}/${clientId}`,
-    });
+    return this.apiClient.client.api.deleteClient(clientId, password);
   }
 
   /**
@@ -78,11 +70,7 @@ export class ClientService {
    * @returns Resolves once the deletion of the temporary client is complete
    */
   deleteTemporaryClient(clientId: string): Promise<void> {
-    return this.backendClient.sendJson({
-      data: {},
-      type: 'DELETE',
-      url: `${ClientService.URL_CLIENTS}/${clientId}`,
-    });
+    return this.apiClient.client.api.deleteClient(clientId);
   }
 
   /**
@@ -93,10 +81,7 @@ export class ClientService {
    * @returns Resolves with the requested client
    */
   getClientById(clientId: string): Promise<RegisteredClient> {
-    return this.backendClient.sendRequest({
-      type: 'GET',
-      url: `${ClientService.URL_CLIENTS}/${clientId}`,
-    });
+    return this.apiClient.client.api.getClient(clientId);
   }
 
   /**
@@ -105,10 +90,7 @@ export class ClientService {
    * @returns Resolves with the clients of the self user
    */
   getClients(): Promise<RegisteredClient[]> {
-    return this.backendClient.sendRequest({
-      type: 'GET',
-      url: ClientService.URL_CLIENTS,
-    });
+    return this.apiClient.client.api.getClients();
   }
 
   /**
@@ -119,10 +101,7 @@ export class ClientService {
    * @returns Resolves with the clients of a user
    */
   getClientsByUserId(userId: string): Promise<PublicClient[]> {
-    return this.backendClient.sendRequest({
-      type: 'GET',
-      url: `${ClientService.URL_USERS}/${userId}${ClientService.URL_CLIENTS}`,
-    });
+    return this.apiClient.user.api.getClients(userId);
   }
 
   /**
@@ -131,11 +110,7 @@ export class ClientService {
    * @returns Resolves with the registered client information
    */
   postClients(newClient: NewClient): Promise<RegisteredClient> {
-    return this.backendClient.sendJson({
-      data: newClient,
-      type: 'POST',
-      url: ClientService.URL_CLIENTS,
-    });
+    return this.apiClient.client.api.postClient(newClient);
   }
 
   //##############################################################################
@@ -155,7 +130,7 @@ export class ClientService {
    * Load all clients we have stored in the database.
    * @returns Resolves with all the clients payloads
    */
-  loadAllClientsFromDb(): Promise<any[]> {
+  loadAllClientsFromDb(): Promise<ClientRecord[]> {
     return this.storageService.getAll(this.CLIENT_STORE_NAME);
   }
 
@@ -164,7 +139,7 @@ export class ClientService {
    * @param primaryKey Primary key used to find a client in the database
    * @returns Resolves with the client's payload or the primary key if not found
    */
-  async loadClientFromDb(primaryKey: string): Promise<object | string> {
+  async loadClientFromDb(primaryKey: string): Promise<ClientRecord | string> {
     let clientRecord;
 
     if (this.storageService.db) {
@@ -174,7 +149,7 @@ export class ClientService {
         .equals(primaryKey)
         .first();
     } else {
-      clientRecord = await this.storageService.load(this.CLIENT_STORE_NAME, primaryKey);
+      clientRecord = await this.storageService.load<ClientRecord>(this.CLIENT_STORE_NAME, primaryKey);
     }
 
     if (clientRecord === undefined) {
@@ -193,7 +168,7 @@ export class ClientService {
    * @param clientPayload Client payload
    * @returns Resolves with the client payload stored in database
    */
-  saveClientInDb(primaryKey: string, clientPayload: any): Promise<any> {
+  saveClientInDb(primaryKey: string, clientPayload: ClientRecord): Promise<ClientRecord> {
     if (!clientPayload.meta) {
       clientPayload.meta = {};
     }
@@ -213,7 +188,7 @@ export class ClientService {
    * @param changes Incremental update changes of the client JSON
    * @returns Number of updated records (1 if an object was updated, otherwise 0)
    */
-  updateClientInDb(primaryKey: string, changes: object): Promise<number> {
+  updateClientInDb(primaryKey: string, changes: Partial<ClientRecord>): Promise<number> {
     return this.storageService.update(this.CLIENT_STORE_NAME, primaryKey, changes);
   }
 }

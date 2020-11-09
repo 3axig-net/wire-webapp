@@ -17,8 +17,8 @@
  *
  */
 
-import {pathWithParams} from '@wireapp/commons/dist/commonjs/util/UrlUtil';
-import {StyledApp} from '@wireapp/react-ui-kit';
+import {pathWithParams} from '@wireapp/commons/src/main/util/UrlUtil';
+import {StyledApp, Loading, ContainerXS} from '@wireapp/react-ui-kit';
 import React, {useEffect} from 'react';
 import {IntlProvider} from 'react-intl';
 import {connect} from 'react-redux';
@@ -43,6 +43,7 @@ import Index from './Index';
 import InitialInvite from './InitialInvite';
 import Login from './Login';
 import PhoneLogin from './PhoneLogin';
+import SetAccountType from './SetAccountType';
 import SetEmail from './SetEmail';
 import SetHandle from './SetHandle';
 import SetPassword from './SetPassword';
@@ -51,26 +52,33 @@ import TeamName from './TeamName';
 import VerifyEmailCode from './VerifyEmailCode';
 import VerifyEmailLink from './VerifyEmailLink';
 import VerifyPhoneCode from './VerifyPhoneCode';
+import CustomEnvironmentRedirect from './CustomEnvironmentRedirect';
 
 interface Props extends React.HTMLProps<HTMLDivElement> {}
 
 const Root = ({
   isAuthenticated,
   language,
+  isFetchingSSOSettings,
   startPolling,
   safelyRemoveCookie,
   stopPolling,
+  doGetSSOSettings,
 }: Props & ConnectedProps & DispatchProps) => {
   useEffect(() => {
     startPolling();
     window.onbeforeunload = () => {
-      safelyRemoveCookie(CookieSelector.COOKIE_NAME_APP_OPENED, Config.APP_INSTANCE_ID);
+      safelyRemoveCookie(CookieSelector.COOKIE_NAME_APP_OPENED, Config.getConfig().APP_INSTANCE_ID);
       stopPolling();
     };
   }, []);
 
+  useEffect(() => {
+    doGetSSOSettings();
+  }, []);
+
   const loadLanguage = (language: string) => {
-    return require(`Resource/translation/${mapLanguage(language)}.json`);
+    return require(`I18n/${mapLanguage(language)}.json`);
   };
 
   const navigate = (route: string): null => {
@@ -78,7 +86,7 @@ const Root = ({
     return null;
   };
 
-  const isAuthenticatedCheck = (page: any): any => (page ? (isAuthenticated ? page : navigate('/auth#login')) : null);
+  const isAuthenticatedCheck = (page: any): any => (page ? (isAuthenticated ? page : navigate('/auth')) : null);
 
   const ProtectedHistoryInfo = () => isAuthenticatedCheck(<HistoryInfo />);
   const ProtectedInitialInvite = () => isAuthenticatedCheck(<InitialInvite />);
@@ -91,39 +99,50 @@ const Root = ({
   return (
     <IntlProvider locale={normalizeLanguage(language)} messages={loadLanguage(language)}>
       <StyledApp style={{display: 'flex', height: '100%', minHeight: '100vh'}}>
-        <Router hashType="noslash">
-          <Switch>
-            <Route exact path={ROUTE.INDEX} component={Index} />
-            <Route path={ROUTE.CHECK_PASSWORD} component={CheckPassword} />
-            <Route path={ROUTE.CLIENTS} component={ProtectedClientManager} />
-            <Route path={ROUTE.CONVERSATION_JOIN_INVALID} component={ConversationJoinInvalid} />
-            <Route path={ROUTE.CONVERSATION_JOIN} component={ConversationJoin} />
-            <Route path={ROUTE.CREATE_TEAM} component={Config.FEATURE.ENABLE_ACCOUNT_REGISTRATION && TeamName} />
-            <Route path={ROUTE.HISTORY_INFO} component={ProtectedHistoryInfo} />
-            <Route path={ROUTE.INITIAL_INVITE} component={ProtectedInitialInvite} />
-            <Route path={ROUTE.LOGIN} component={Login} />
-            <Route path={ROUTE.LOGIN_PHONE} component={PhoneLogin} />
-            <Route path={ROUTE.SET_EMAIL} component={ProtectedSetEmail} />
-            <Route path={ROUTE.SET_HANDLE} component={ProtectedSetHandle} />
-            <Route path={ROUTE.SET_PASSWORD} component={ProtectedSetPassword} />
-            <Route path={ROUTE.SSO} component={SingleSignOn} />
-            <Route path={ROUTE.VERIFY_EMAIL_LINK} component={VerifyEmailLink} />
-            <Route path={ROUTE.VERIFY_PHONE_CODE} component={VerifyPhoneCode} />
-            <Route
-              path={ROUTE.VERIFY_EMAIL_CODE}
-              component={Config.FEATURE.ENABLE_ACCOUNT_REGISTRATION && VerifyEmailCode}
-            />
-            <Route
-              path={ROUTE.CREATE_ACCOUNT}
-              component={Config.FEATURE.ENABLE_ACCOUNT_REGISTRATION && CreatePersonalAccount}
-            />
-            <Route
-              path={ROUTE.CREATE_TEAM_ACCOUNT}
-              component={Config.FEATURE.ENABLE_ACCOUNT_REGISTRATION && CreateAccount}
-            />
-            <Redirect to={ROUTE.INDEX} />
-          </Switch>
-        </Router>
+        {isFetchingSSOSettings ? (
+          <ContainerXS centerText verticalCenter style={{justifyContent: 'center'}}>
+            <Loading />
+          </ContainerXS>
+        ) : (
+          <Router hashType="noslash">
+            <Switch>
+              <Route exact path={ROUTE.INDEX} component={Index} />
+              <Route path={ROUTE.CHECK_PASSWORD} component={CheckPassword} />
+              <Route path={ROUTE.CLIENTS} component={ProtectedClientManager} />
+              <Route path={ROUTE.CONVERSATION_JOIN_INVALID} component={ConversationJoinInvalid} />
+              <Route path={ROUTE.CONVERSATION_JOIN} component={ConversationJoin} />
+              <Route
+                path={ROUTE.CREATE_TEAM}
+                component={Config.getConfig().FEATURE.ENABLE_ACCOUNT_REGISTRATION && TeamName}
+              />
+              <Route path={ROUTE.HISTORY_INFO} component={ProtectedHistoryInfo} />
+              <Route path={ROUTE.INITIAL_INVITE} component={ProtectedInitialInvite} />
+              <Route path={ROUTE.LOGIN} component={Login} />
+              <Route path={ROUTE.LOGIN_PHONE} component={PhoneLogin} />
+              <Route path={ROUTE.SET_ACCOUNT_TYPE} component={SetAccountType} />
+              <Route path={ROUTE.SET_EMAIL} component={ProtectedSetEmail} />
+              <Route path={ROUTE.SET_HANDLE} component={ProtectedSetHandle} />
+              <Route path={ROUTE.SET_PASSWORD} component={ProtectedSetPassword} />
+              <Route path={`${ROUTE.SSO}/:code?`} component={SingleSignOn} />
+              <Route path={ROUTE.VERIFY_EMAIL_LINK} component={VerifyEmailLink} />
+              <Route path={ROUTE.VERIFY_PHONE_CODE} component={VerifyPhoneCode} />
+              <Route path={ROUTE.CUSTOM_ENV_REDIRECT} component={CustomEnvironmentRedirect} />
+              <Route
+                path={ROUTE.VERIFY_EMAIL_CODE}
+                component={Config.getConfig().FEATURE.ENABLE_ACCOUNT_REGISTRATION && VerifyEmailCode}
+              />
+              <Route
+                path={ROUTE.CREATE_ACCOUNT}
+                component={Config.getConfig().FEATURE.ENABLE_ACCOUNT_REGISTRATION && CreatePersonalAccount}
+              />
+              <Route
+                path={ROUTE.CREATE_TEAM_ACCOUNT}
+                component={Config.getConfig().FEATURE.ENABLE_ACCOUNT_REGISTRATION && CreateAccount}
+              />
+              <Redirect to={ROUTE.INDEX} />
+            </Switch>
+          </Router>
+        )}
       </StyledApp>
     </IntlProvider>
   );
@@ -132,6 +151,7 @@ const Root = ({
 type ConnectedProps = ReturnType<typeof mapStateToProps>;
 const mapStateToProps = (state: RootState) => ({
   isAuthenticated: AuthSelector.isAuthenticated(state),
+  isFetchingSSOSettings: AuthSelector.isFetchingSSOSettings(state),
   language: LanguageSelector.getLanguage(state),
 });
 
@@ -139,6 +159,7 @@ type DispatchProps = ReturnType<typeof mapDispatchToProps>;
 const mapDispatchToProps = (dispatch: Dispatch<AnyAction>) =>
   bindActionCreators(
     {
+      doGetSSOSettings: ROOT_ACTIONS.authAction.doGetSSOSettings,
       safelyRemoveCookie: ROOT_ACTIONS.cookieAction.safelyRemoveCookie,
       startPolling: ROOT_ACTIONS.cookieAction.startPolling,
       stopPolling: ROOT_ACTIONS.cookieAction.stopPolling,

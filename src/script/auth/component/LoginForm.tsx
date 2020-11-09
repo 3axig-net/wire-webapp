@@ -17,7 +17,7 @@
  *
  */
 
-import {LoginData} from '@wireapp/api-client/dist/auth';
+import {LoginData} from '@wireapp/api-client/src/auth';
 import {ArrowIcon, Input, InputBlock, InputSubmitCombo, Loading, RoundIconButton} from '@wireapp/react-ui-kit';
 import React, {useRef, useState} from 'react';
 import {useIntl} from 'react-intl';
@@ -66,9 +66,9 @@ const LoginForm = ({isFetching, onSubmit}: LoginFormProps) => {
     const localEmail = email.trim();
     if (isValidEmail(localEmail)) {
       loginData.email = localEmail;
-    } else if (isValidUsername(localEmail)) {
-      loginData.handle = localEmail.replace('@', '');
-    } else if (Config.FEATURE.ENABLE_PHONE_LOGIN && isValidPhoneNumber(localEmail)) {
+    } else if (isValidUsername(localEmail.toLowerCase())) {
+      loginData.handle = localEmail.replace('@', '').toLowerCase();
+    } else if (Config.getConfig().FEATURE.ENABLE_PHONE_LOGIN && isValidPhoneNumber(localEmail)) {
       loginData.phone = localEmail;
     }
     onSubmit(loginData, validationErrors);
@@ -91,6 +91,7 @@ const LoginForm = ({isFetching, onSubmit}: LoginFormProps) => {
         maxLength={128}
         type="text"
         required
+        autoFocus
         data-uie-name="enter-email"
       />
       <InputSubmitCombo>
@@ -107,7 +108,7 @@ const LoginForm = ({isFetching, onSubmit}: LoginFormProps) => {
           autoComplete="section-login password"
           type="password"
           placeholder={_(loginStrings.passwordPlaceholder)}
-          pattern={`.{1,1024}`}
+          pattern={'.{1,1024}'}
           required
           data-uie-name="enter-password"
         />

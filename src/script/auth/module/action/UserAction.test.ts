@@ -34,6 +34,7 @@ describe('UserAction', () => {
       apiClient: mockedApiClient,
     })({});
     await store.dispatch(actionRoot.userAction.doSendActivationCode(email));
+
     expect(store.getActions()).toEqual([
       UserActionCreator.startSendActivationCode(),
       UserActionCreator.successfulSendActivationCode(),
@@ -41,7 +42,7 @@ describe('UserAction', () => {
   });
 
   it('handles failed request for activation code', async () => {
-    const error = new Error('testerror');
+    const error = new Error('test error');
     const email = 'mail@mail.com';
     const mockedActions = {};
     const mockedApiClient = {

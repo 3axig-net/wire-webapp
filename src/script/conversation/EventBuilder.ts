@@ -17,26 +17,24 @@
  *
  */
 
-import {LegalHoldStatus} from '@wireapp/api-client/dist/team/legalhold';
-import {REASON as AVS_REASON} from '@wireapp/avs';
-
+import type {LegalHoldStatus} from '@wireapp/protocol-messaging';
+import {CONVERSATION_EVENT} from '@wireapp/api-client/src/event';
+import type {REASON as AVS_REASON} from '@wireapp/avs';
 import {createRandomUuid} from 'Util/util';
-
-import {BackendEvent} from '../event/Backend';
 import {CALL, CONVERSATION, ClientEvent} from '../event/Client';
-
-import {Call as CallEntity} from '../calling/Call';
+import type {Call as CallEntity} from '../calling/Call';
 import {StatusType} from '../message/StatusType';
 import {VerificationMessageType} from '../message/VerificationMessageType';
-
-import {Conversation} from '../entity/Conversation';
-import {Message} from '../entity/message/Message';
-import {User} from '../entity/User';
+import type {Conversation} from '../entity/Conversation';
+import type {Message} from '../entity/message/Message';
+import type {User} from '../entity/User';
+import {EventRecord} from '../storage';
 
 export interface BaseEvent {
   conversation: string;
   from: string;
-  time: string;
+  id?: string;
+  time: string | number;
 }
 
 export interface ConversationEvent<T> extends BaseEvent {
@@ -72,7 +70,8 @@ export interface VoiceChannelActivateEvent extends BaseEvent {
 }
 
 export type AllVerifiedEvent = ConversationEvent<{type: VerificationMessageType}>;
-export type AssetAddEvent = Omit<ConversationEvent<any>, 'id'> & {status: StatusType};
+export type AssetAddEvent = Omit<ConversationEvent<any>, 'id'> &
+  Partial<Pick<ConversationEvent<any>, 'id'>> & {status: StatusType};
 export type DegradedMessageEvent = ConversationEvent<{type: VerificationMessageType; userIds: string[]}>;
 export type DeleteEvent = ConversationEvent<{deleted_time: number}>;
 export type GroupCreationEvent = ConversationEvent<{allTeamMembers: boolean; name: string; userIds: string[]}>;
@@ -81,16 +80,17 @@ export type MemberJoinEvent = BackendEventMessage<{user_ids: string[]}>;
 export type MemberLeaveEvent = BackendEventMessage<{user_ids: string[]}>;
 export type MessageAddEvent = Omit<ConversationEvent<{}>, 'id'> & {status: StatusType};
 export type MissedEvent = BaseEvent & {id: string; type: string};
-export type OnetoOneCreationEvent = ConversationEvent<{userIds: string[]}>;
+export type OneToOneCreationEvent = ConversationEvent<{userIds: string[]}>;
 export type TeamMemberLeaveEvent = ConversationEvent<{name: string; user_ids: string[]}>;
 export type VoiceChannelDeactivateEvent = ConversationEvent<{duration: number; reason: AVS_REASON}> & {
   protocol_version: number;
 };
+export type FileTypeRestrictedEvent = ConversationEvent<{fileExt: string; isIncoming: boolean; name: string}>;
 
 export const EventBuilder = {
-  build1to1Creation(conversationEntity: Conversation, timestamp: number): OnetoOneCreationEvent {
+  build1to1Creation(conversationEntity: Conversation, timestamp: number = 0): OneToOneCreationEvent {
     const {creator: creatorId, id} = conversationEntity;
-    const isoDate = new Date(timestamp || 0).toISOString();
+    const isoDate = new Date(timestamp).toISOString();
 
     return {
       conversation: id,
@@ -103,6 +103,7 @@ export const EventBuilder = {
       type: ClientEvent.CONVERSATION.ONE2ONE_CREATION,
     };
   },
+
   buildAllVerified(conversationEntity: Conversation, currentTimestamp: number): AllVerifiedEvent {
     return {
       conversation: conversationEntity.id,
@@ -115,6 +116,7 @@ export const EventBuilder = {
       type: ClientEvent.CONVERSATION.VERIFICATION,
     };
   },
+
   buildAssetAdd(conversationEntity: Conversation, data: any, currentTimestamp: number): AssetAddEvent {
     return {
       conversation: conversationEntity.id,
@@ -125,6 +127,7 @@ export const EventBuilder = {
       type: ClientEvent.CONVERSATION.ASSET_ADD,
     };
   },
+
   buildCalling(
     conversationEntity: Conversation,
     callMessage: CallEntity,
@@ -139,6 +142,7 @@ export const EventBuilder = {
       type: ClientEvent.CALL.E_CALL,
     };
   },
+
   buildDegraded(
     conversationEntity: Conversation,
     userIds: string[],
@@ -157,6 +161,7 @@ export const EventBuilder = {
       type: ClientEvent.CONVERSATION.VERIFICATION,
     };
   },
+
   buildDelete(conversationId: string, messageId: string, time: number, deletedMessageEntity: Message): DeleteEvent {
     return {
       conversation: conversationId,
@@ -169,6 +174,28 @@ export const EventBuilder = {
       type: ClientEvent.CONVERSATION.DELETE_EVERYWHERE,
     };
   },
+
+  buildFileTypeRestricted(
+    conversation: Conversation,
+    user: User,
+    isIncoming: boolean,
+    fileExt: string,
+    id: string,
+  ): FileTypeRestrictedEvent {
+    return {
+      conversation: conversation.id,
+      data: {
+        fileExt,
+        isIncoming,
+        name: user.name(),
+      },
+      from: user.id,
+      id,
+      time: conversation.get_next_iso_date(),
+      type: ClientEvent.CONVERSATION.FILE_TYPE_RESTRICTED,
+    };
+  },
+
   buildGroupCreation(
     conversationEntity: Conversation,
     isTemporaryGuest: boolean = false,
@@ -197,6 +224,7 @@ export const EventBuilder = {
       type: ClientEvent.CONVERSATION.GROUP_CREATION,
     };
   },
+
   buildIncomingMessageTooBig(event: any, messageError: Error, errorCode: number): ErrorEvent {
     const {conversation: conversationId, data: eventData, from, time} = event;
 
@@ -210,6 +238,7 @@ export const EventBuilder = {
       type: ClientEvent.CONVERSATION.INCOMING_MESSAGE_TOO_BIG,
     };
   },
+
   buildLegalHoldMessage(
     conversationId: string,
     userId: string,
@@ -228,6 +257,7 @@ export const EventBuilder = {
       type: ClientEvent.CONVERSATION.LEGAL_HOLD_UPDATE,
     };
   },
+
   buildMemberJoin(
     conversationEntity: Conversation,
     sender: string,
@@ -246,9 +276,10 @@ export const EventBuilder = {
       },
       from: sender,
       time: isoDate,
-      type: BackendEvent.CONVERSATION.MEMBER_JOIN,
+      type: CONVERSATION_EVENT.MEMBER_JOIN,
     };
   },
+
   buildMemberLeave(
     conversationEntity: Conversation,
     userId: string,
@@ -262,9 +293,10 @@ export const EventBuilder = {
       },
       from: removedBySelfUser ? conversationEntity.selfUser().id : userId,
       time: conversationEntity.get_next_iso_date(currentTimestamp),
-      type: BackendEvent.CONVERSATION.MEMBER_LEAVE,
+      type: CONVERSATION_EVENT.MEMBER_LEAVE,
     };
   },
+
   buildMessageAdd(conversationEntity: Conversation, currentTimestamp: number): MessageAddEvent {
     return {
       conversation: conversationEntity.id,
@@ -275,6 +307,7 @@ export const EventBuilder = {
       type: ClientEvent.CONVERSATION.MESSAGE_ADD,
     };
   },
+
   buildMissed(conversationEntity: Conversation, currentTimestamp: number): MissedEvent {
     return {
       conversation: conversationEntity.id,
@@ -284,7 +317,12 @@ export const EventBuilder = {
       type: ClientEvent.CONVERSATION.MISSED_MESSAGES,
     };
   },
-  buildTeamMemberLeave(conversationEntity: Conversation, userEntity: User, isoDate: string): TeamMemberLeaveEvent {
+
+  buildTeamMemberLeave(
+    conversationEntity: Conversation,
+    userEntity: User,
+    isoDate: string | number,
+  ): TeamMemberLeaveEvent {
     return {
       conversation: conversationEntity.id,
       data: {
@@ -297,7 +335,8 @@ export const EventBuilder = {
       type: ClientEvent.CONVERSATION.TEAM_MEMBER_LEAVE,
     };
   },
-  buildUnableToDecrypt(event: any, decryptionError: Error, errorCode: number): ErrorEvent {
+
+  buildUnableToDecrypt(event: EventRecord, decryptionError: Error, errorCode: number): ErrorEvent {
     const {conversation: conversationId, data: eventData, from, time} = event;
 
     return {
@@ -310,6 +349,7 @@ export const EventBuilder = {
       type: ClientEvent.CONVERSATION.UNABLE_TO_DECRYPT,
     };
   },
+
   buildVoiceChannelActivate(
     conversationId: string,
     userId: string,
@@ -325,6 +365,7 @@ export const EventBuilder = {
       type: ClientEvent.CONVERSATION.VOICE_CHANNEL_ACTIVATE,
     };
   },
+
   buildVoiceChannelDeactivate(
     conversationId: string,
     userId: string,
@@ -347,7 +388,3 @@ export const EventBuilder = {
     };
   },
 };
-
-window.z = window.z || {};
-window.z.conversation = window.z.conversation || {};
-window.z.conversation.EventBuilder = EventBuilder;

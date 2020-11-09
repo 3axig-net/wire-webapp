@@ -17,9 +17,10 @@
  *
  */
 
-import {TeamData} from '@wireapp/api-client/dist/team';
-import {RootState} from '../reducer';
-import {RegistrationDataState} from '../reducer/authReducer';
+import type {TeamData} from '@wireapp/api-client/src/team';
+
+import type {RootState} from '../reducer';
+import type {RegistrationDataState} from '../reducer/authReducer';
 
 export const REGISTER_FLOW = {
   GENERIC_INVITATION: 'REGISTER_FLOW_GENERIC_INVITATION',
@@ -53,6 +54,9 @@ const unsetTeam: TeamData = {
 
 export const isAuthenticated = (state: RootState) => state.authState.isAuthenticated;
 export const isFetching = (state: RootState) => state.authState.fetching;
+export const isFetchingSSOSettings = (state: RootState) => state.authState.fetchingSSOSettings;
+export const getDefaultSSOCode = (state: RootState) => state.authState.ssoSettings?.default_sso_code;
+export const hasDefaultSSOCode = (state: RootState) => !!state.authState.ssoSettings?.default_sso_code;
 export const getError = (state: RootState) => state.authState.error;
 export const getLoginData = (state: RootState) => state.authState.loginData;
 export const getCurrentFlow = (state: RootState) => state.authState.currentFlow;

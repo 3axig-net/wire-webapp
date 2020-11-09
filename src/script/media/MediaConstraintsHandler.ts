@@ -18,12 +18,11 @@
  */
 
 import {Logger, getLogger} from 'Util/Logger';
-import {CurrentAvailableDeviceId} from './MediaDevicesHandler';
+import type {CurrentAvailableDeviceId} from './MediaDevicesHandler';
 
 import {VIDEO_QUALITY_MODE} from './VideoQualityMode';
 
 interface Config {
-  DEFAULT_DEVICE_ID: string;
   CONSTRAINTS: {
     SCREEN: {
       DESKTOP_CAPTURER: MediaTrackConstraints & {
@@ -34,13 +33,14 @@ interface Config {
     };
     VIDEO: Record<VIDEO_QUALITY_MODE, MediaTrackConstraints> & {PREFERRED_FACING_MODE: string};
   };
+  DEFAULT_DEVICE_ID: string;
 }
 
 export enum ScreensharingMethods {
-  DISPLAY_MEDIA,
-  USER_MEDIA,
-  DESKTOP_CAPTURER,
-  NONE,
+  DISPLAY_MEDIA = 0,
+  USER_MEDIA = 1,
+  DESKTOP_CAPTURER = 2,
+  NONE = 3,
 }
 
 export class MediaConstraintsHandler {
@@ -131,28 +131,28 @@ export class MediaConstraintsHandler {
         streamConstraints.video.mandatory = {...streamConstraints.video.mandatory, chromeMediaSourceId};
 
         return streamConstraints as MediaStreamConstraints;
-
       case ScreensharingMethods.DISPLAY_MEDIA:
         this.logger.info('Enabling screen sharing from getDisplayMedia');
         return {
           audio: false,
           video: MediaConstraintsHandler.CONFIG.CONSTRAINTS.SCREEN.DISPLAY_MEDIA,
         };
-
       case ScreensharingMethods.USER_MEDIA:
         this.logger.info('Enabling screen sharing from getUserMedia');
         return {
           audio: false,
           video: MediaConstraintsHandler.CONFIG.CONSTRAINTS.SCREEN.USER_MEDIA,
         };
+      default:
+        return undefined;
     }
-
-    return undefined;
   }
 
-  private getAudioStreamConstraints(mediaDeviceId: string = ''): MediaTrackConstraints | boolean {
+  private getAudioStreamConstraints(mediaDeviceId: string = ''): MediaTrackConstraints {
     const requireExactMediaDevice = mediaDeviceId && mediaDeviceId !== MediaConstraintsHandler.CONFIG.DEFAULT_DEVICE_ID;
-    return requireExactMediaDevice ? {deviceId: {exact: mediaDeviceId}} : true;
+    return requireExactMediaDevice
+      ? {autoGainControl: false, deviceId: {exact: mediaDeviceId}}
+      : {autoGainControl: false};
   }
 
   private getVideoStreamConstraints(
@@ -166,6 +166,8 @@ export class MediaConstraintsHandler {
     } else {
       streamConstraints.facingMode = MediaConstraintsHandler.CONFIG.CONSTRAINTS.VIDEO.PREFERRED_FACING_MODE;
     }
+
+    streamConstraints.autoGainControl = false;
 
     return streamConstraints;
   }

@@ -18,33 +18,33 @@
  */
 
 import * as faker from 'faker';
-import {User} from '../../src/script/entity/User';
+import type {User as APIClientUser} from '@wireapp/api-client/src/user';
+import {UserAssetType} from '@wireapp/api-client/src/user';
+
+import type {User} from '../../src/script/entity/User';
 import {serverTimeHandler} from '../../src/script/time/serverTimeHandler';
 import {UserMapper} from '../../src/script/user/UserMapper';
-
-const UUID = require('pure-uuid');
+import {createRandomUuid} from 'Util/util';
 
 export class UserGenerator {
   static getRandomUser(): User | void {
-    const template: Object = {
-      handle: faker.internet.userName(),
-      locale: 'en',
+    const template: APIClientUser = {
       accent_id: Math.floor(Math.random() * 7 + 1),
-      picture: [],
-      name: faker.name.findName(),
-      id: new UUID(4).format(),
       assets: [
         {
-          size: 'preview',
-          key: `3-1-${new UUID(4).format()}`,
+          key: `3-1-${createRandomUuid()}`,
+          size: UserAssetType.PREVIEW,
           type: 'image',
         },
         {
-          size: 'complete',
-          key: `3-1-${new UUID(4).format()}`,
+          key: `3-1-${createRandomUuid()}`,
+          size: UserAssetType.COMPLETE,
           type: 'image',
         },
       ],
+      handle: faker.internet.userName(),
+      id: createRandomUuid(),
+      name: faker.name.findName(),
     };
 
     return new UserMapper(serverTimeHandler).mapUserFromJson(template);

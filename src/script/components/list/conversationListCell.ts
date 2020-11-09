@@ -21,37 +21,38 @@ import ko from 'knockout';
 
 import {noop} from 'Util/util';
 
-import {ParticipantAvatar} from 'Components/participantAvatar';
+import {AVATAR_SIZE} from 'Components/ParticipantAvatar';
 import {generateCellState} from '../../conversation/ConversationCellState';
 import {ConversationStatusIcon} from '../../conversation/ConversationStatusIcon';
-import {Conversation} from '../../entity/Conversation';
+import type {Conversation} from '../../entity/Conversation';
 import {MediaType} from '../../media/MediaType';
 import {viewportObserver} from '../../ui/viewportObserver';
 
 import 'Components/availabilityState';
+import type {User} from '../../entity/User';
 
 interface ConversationListCellProps {
-  showJoinButton: boolean;
-  conversation: Conversation;
-  onJoinCall: (conversation: Conversation, mediaType: MediaType) => void;
-  is_selected: (conversation: Conversation) => boolean;
   click: () => void;
+  conversation: Conversation;
   index: ko.Observable<number>;
+  is_selected: (conversation: Conversation) => boolean;
   isVisibleFunc: (top: number, bottom: number) => boolean;
   offsetTop: ko.Observable<number>;
+  onJoinCall: (conversation: Conversation, mediaType: MediaType) => void;
+  showJoinButton: boolean;
 }
 
 class ConversationListCell {
   conversation: Conversation;
   isSelected: ko.Computed<boolean>;
   on_click: () => void;
-  ParticipantAvatar: typeof ParticipantAvatar;
+  AVATAR_SIZE: typeof AVATAR_SIZE;
   showJoinButton: boolean;
   isGroup: boolean;
   is1To1: boolean;
   isInTeam: boolean;
   isInViewport: ko.Observable<boolean>;
-  users: any;
+  users: ko.ObservableArray<User>;
   cell_state: ko.Observable<ReturnType<typeof generateCellState>>;
   ConversationStatusIcon: typeof ConversationStatusIcon;
   onClickJoinCall: (viewModel: ConversationListCell, event: MouseEvent) => void;
@@ -73,7 +74,7 @@ class ConversationListCell {
     this.isSelected = ko.computed(() => is_selected(conversation));
     // TODO: "click" should be renamed to "right_click"
     this.on_click = click;
-    this.ParticipantAvatar = ParticipantAvatar;
+    this.AVATAR_SIZE = AVATAR_SIZE;
     this.showJoinButton = showJoinButton;
     this.isGroup = conversation.isGroup();
     this.is1To1 = conversation.is1to1();
@@ -108,7 +109,7 @@ class ConversationListCell {
 
     this.users = this.conversation.participating_user_ets;
 
-    this.cell_state = ko.observable({icon: null, description: null});
+    this.cell_state = ko.observable({description: null, icon: null});
 
     this.ConversationStatusIcon = ConversationStatusIcon;
 
@@ -139,7 +140,7 @@ ko.components.register('conversation-list-cell', {
         <!-- /ko -->
         <!-- ko if: !isGroup && users().length -->
           <div class="avatar-halo">
-            <participant-avatar params="participant: users()[0], size: ParticipantAvatar.SIZE.SMALL"></participant-avatar>
+            <participant-avatar params="participant: users()[0], size: AVATAR_SIZE.SMALL"></participant-avatar>
           </div>
         <!-- /ko -->
       </div>

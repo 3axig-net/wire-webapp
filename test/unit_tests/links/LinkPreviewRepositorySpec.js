@@ -18,35 +18,38 @@
  */
 
 import {AssetService} from 'src/script/assets/AssetService';
-import {graph, resolve as resolveDependency} from '../../api/testResolver';
+import {container} from 'tsyringe';
 import {PropertiesRepository} from 'src/script/properties/PropertiesRepository';
 import {PropertiesService} from 'src/script/properties/PropertiesService';
 import {SelfService} from 'src/script/self/SelfService';
 import {LinkPreviewRepository} from 'src/script/links/LinkPreviewRepository';
+import {APIClient} from 'src/script/service/APIClientSingleton';
+
+import {LinkPreviewError} from 'src/script/error/LinkPreviewError';
+import {AssetRepository} from 'src/script/assets/AssetRepository';
 
 describe('LinkPreviewRepository', () => {
   let link_preview_repository = null;
 
   beforeEach(() => {
-    const backendClient = resolveDependency(graph.BackendClient);
-    const propertiesRepository = new PropertiesRepository(
-      new PropertiesService(backendClient),
-      new SelfService(backendClient),
-    );
-    link_preview_repository = new LinkPreviewRepository(new AssetService(backendClient), propertiesRepository);
+    const apiClient = container.resolve(APIClient);
+    const assetService = new AssetService(container.resolve(APIClient));
+    const assetRepository = new AssetRepository(assetService);
+    const propertiesRepository = new PropertiesRepository(new PropertiesService(apiClient), new SelfService(apiClient));
+    link_preview_repository = new LinkPreviewRepository(assetRepository, propertiesRepository);
   });
 
   afterEach(() => (window.openGraphAsync = undefined));
 
-  describe('_getLinkPreview', () => {
+  describe('getLinkPreview', () => {
     it('fetches open graph data if openGraph lib is available', done => {
       window.openGraphAsync = () => Promise.resolve();
 
       link_preview_repository
-        ._getLinkPreview('https://app.wire.com/')
+        .getLinkPreview('https://app.wire.com/')
         .then(done.fail)
         .catch(error => {
-          expect(error.type).toBe(z.error.LinkPreviewError.TYPE.NO_DATA_AVAILABLE);
+          expect(error.type).toBe(LinkPreviewError.TYPE.NO_DATA_AVAILABLE);
           done();
         });
     });
@@ -55,10 +58,10 @@ describe('LinkPreviewRepository', () => {
       window.openGraphAsync = () => Promise.resolve();
 
       link_preview_repository
-        ._getLinkPreview('https://www.youtube.com/watch?v=t4gjl-uwUHc')
+        .getLinkPreview('https://www.youtube.com/watch?v=t4gjl-uwUHc')
         .then(done.fail)
         .catch(error => {
-          expect(error.type).toBe(z.error.LinkPreviewError.TYPE.BLACKLISTED);
+          expect(error.type).toBe(LinkPreviewError.TYPE.BLACKLISTED);
           done();
         });
     });
@@ -68,10 +71,10 @@ describe('LinkPreviewRepository', () => {
 
       const invalidUrl = 'http:////api/apikey';
       link_preview_repository
-        ._getLinkPreview(invalidUrl)
+        .getLinkPreview(invalidUrl)
         .then(done.fail)
         .catch(error => {
-          expect(error.type).toBe(z.error.LinkPreviewError.TYPE.UNSUPPORTED_TYPE);
+          expect(error.type).toBe(LinkPreviewError.TYPE.UNSUPPORTED_TYPE);
           done();
         });
     });

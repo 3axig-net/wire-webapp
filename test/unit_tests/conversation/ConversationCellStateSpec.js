@@ -34,7 +34,7 @@ describe('ConversationCellState', () => {
     const conversationEntity = new Conversation(createRandomUuid());
 
     const selfUserEntity = new User(createRandomUuid());
-    selfUserEntity.is_me = true;
+    selfUserEntity.isMe = true;
     selfUserEntity.inTeam(true);
     conversationEntity.selfUser(selfUserEntity);
 
@@ -71,7 +71,7 @@ describe('ConversationCellState', () => {
     const conversationEntity = new Conversation(createRandomUuid());
 
     const selfUserEntity = new User(createRandomUuid());
-    selfUserEntity.is_me = true;
+    selfUserEntity.isMe = true;
     selfUserEntity.inTeam(true);
     conversationEntity.selfUser(selfUserEntity);
 
@@ -88,12 +88,10 @@ describe('ConversationCellState', () => {
       {
         description: 'returns the number of missed calls',
         expected: {
-          description: t('conversationsSecondaryLineSummaryMissedCalls'),
+          description: t('conversationsSecondaryLineSummaryMissedCalls', 2),
           icon: ConversationStatusIcon.MISSED_CALL,
         },
-        unreadState: Object.assign({}, defaultUnreadState, {
-          calls: [{}, {}],
-        }),
+        unreadState: {...defaultUnreadState, calls: [{}, {}]},
       },
       {
         description: "returns unread message's text if there is only a single text message",
@@ -101,41 +99,34 @@ describe('ConversationCellState', () => {
           group: {description: 'Felix: Hello there', icon: ConversationStatusIcon.UNREAD_MESSAGES},
           one2one: {description: 'Hello there', icon: ConversationStatusIcon.UNREAD_MESSAGES},
         },
-        unreadState: Object.assign({}, defaultUnreadState, {
-          allMessages: [contentMessage],
-        }),
+        unreadState: {...defaultUnreadState, allMessages: [contentMessage]},
       },
       {
         description: 'returns the number of pings',
-        expected: {description: t('conversationsSecondaryLineSummaryPings'), icon: ConversationStatusIcon.UNREAD_PING},
-        unreadState: Object.assign({}, defaultUnreadState, {
-          pings: [pingMessage, pingMessage],
-        }),
+        expected: {
+          description: t('conversationsSecondaryLineSummaryPings', 2),
+          icon: ConversationStatusIcon.UNREAD_PING,
+        },
+        unreadState: {...defaultUnreadState, pings: [pingMessage, pingMessage]},
       },
       {
         description: 'returns the number of mentions',
         expected: {
-          description: t('conversationsSecondaryLineSummaryMentions'),
+          description: t('conversationsSecondaryLineSummaryMentions', 2),
           icon: ConversationStatusIcon.UNREAD_MENTION,
         },
-        unreadState: Object.assign({}, defaultUnreadState, {
-          selfMentions: [1, 2],
-        }),
+        unreadState: {...defaultUnreadState, selfMentions: [1, 2]},
       },
       {
         description: 'prioritizes mentions, calls, pings and messages',
         expected: {
-          description: `${t('conversationsSecondaryLineSummaryMentions')}, ${t(
+          description: `${t('conversationsSecondaryLineSummaryMentions', 2)}, ${t(
             'conversationsSecondaryLineSummaryMissedCalls',
-          )}, ${t('conversationsSecondaryLineSummaryPings')}, ${t('conversationsSecondaryLineSummaryMessages')}`,
+            2,
+          )}, ${t('conversationsSecondaryLineSummaryPings', 2)}, ${t('conversationsSecondaryLineSummaryMessages', 2)}`,
           icon: ConversationStatusIcon.UNREAD_MENTION,
         },
-        unreadState: Object.assign({}, defaultUnreadState, {
-          calls: [1, 2],
-          otherMessages: [1, 2],
-          pings: [1, 2],
-          selfMentions: [1, 2],
-        }),
+        unreadState: {...defaultUnreadState, calls: [1, 2], otherMessages: [1, 2], pings: [1, 2], selfMentions: [1, 2]},
       },
     ];
 

@@ -18,13 +18,12 @@
  */
 
 import ko from 'knockout';
+import {CONVERSATION_EVENT} from '@wireapp/api-client/src/event';
 
 import {t} from 'Util/LocalizerUtil';
 
-import {SystemMessage} from './SystemMessage';
-
-import {BackendEvent} from '../../event/Backend';
 import {SystemMessageType} from '../../message/SystemMessageType';
+import {SystemMessage} from './SystemMessage';
 
 export class ReceiptModeUpdateMessage extends SystemMessage {
   public caption: ko.PureComputed<string>;
@@ -32,14 +31,14 @@ export class ReceiptModeUpdateMessage extends SystemMessage {
   constructor(isReceiptEnabled: boolean) {
     super();
 
-    this.type = BackendEvent.CONVERSATION.RECEIPT_MODE_UPDATE;
+    this.type = CONVERSATION_EVENT.RECEIPT_MODE_UPDATE;
     this.system_message_type = SystemMessageType.CONVERSATION_RECEIPT_MODE_UPDATE;
 
     this.caption = ko.pureComputed(() => {
       if (isReceiptEnabled) {
-        return this.user().is_me ? t('conversationReceiptsOnYou') : t('conversationReceiptsOn');
+        return this.user().isMe ? t('conversationReceiptsOnYou') : t('conversationReceiptsOn');
       }
-      return this.user().is_me ? t('conversationReceiptsOffYou') : t('conversationReceiptsOff');
+      return this.user().isMe ? t('conversationReceiptsOffYou') : t('conversationReceiptsOff');
     });
   }
 }

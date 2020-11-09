@@ -17,19 +17,23 @@
  *
  */
 
-import {CookiesStatic} from 'js-cookie';
+import type {CookiesStatic} from 'js-cookie';
+
 import {QUERY_KEY} from '../../route';
-import {isFirefox, isPwaSupportedBrowser, isSupportedBrowser} from '../../Runtime';
+import {Runtime} from '@wireapp/commons';
 import {hasURLParameter} from '../../util/urlUtil';
-import {ThunkAction} from '../reducer';
+import type {ThunkAction} from '../reducer';
 import {RuntimeActionCreator} from './creator/';
 
 export class RuntimeAction {
   checkSupportedBrowser = (): ThunkAction<void> => {
-    return (dispatch, getState, {config}) => {
+    return (dispatch, getState, {getConfig}) => {
+      const isPwaSupportedBrowser = () => {
+        return Runtime.isMobileOS() || Runtime.isSafari();
+      };
       const pwaAware = hasURLParameter(QUERY_KEY.PWA_AWARE);
-      const isPwaEnabled = config.URL.MOBILE_BASE && pwaAware && isPwaSupportedBrowser();
-      if (isSupportedBrowser() || isPwaEnabled) {
+      const isPwaEnabled = getConfig().URL.MOBILE_BASE && pwaAware && isPwaSupportedBrowser();
+      if (Runtime.isWebappSupportedBrowser() || isPwaEnabled) {
         dispatch(RuntimeActionCreator.confirmSupportedBrowser());
       }
     };
@@ -90,7 +94,7 @@ export class RuntimeAction {
       return Promise.reject(new Error('IndexedDB not supported'));
     }
 
-    if (isFirefox()) {
+    if (Runtime.isFirefox()) {
       let dbOpenRequest: IDBOpenDBRequest;
 
       try {
@@ -102,7 +106,7 @@ export class RuntimeAction {
       return new Promise((resolve, reject) => {
         const connectionTimeout = setTimeout(
           () => reject(new Error('Error opening IndexedDB (response timeout)')),
-          5000,
+          10000,
         );
         dbOpenRequest.onerror = event => {
           clearTimeout(connectionTimeout);

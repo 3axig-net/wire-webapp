@@ -17,28 +17,13 @@
  *
  */
 
-import {OTRRecipients, UserClients} from '@wireapp/api-client/dist/conversation';
-import {BackendClient} from '../service/BackendClient';
+import type {ClientMismatch, NewOTRMessage} from '@wireapp/api-client/src/conversation';
+import {container} from 'tsyringe';
 
-export interface BroadcastPayload {
-  recipients: OTRRecipients;
-  /** Client ID of the sender */
-  sender: string;
-}
+import {APIClient} from '../service/APIClientSingleton';
 
 export class BroadcastService {
-  private readonly backendClient: BackendClient;
-
-  // tslint:disable-next-line:typedef
-  static get CONFIG() {
-    return {
-      URL_BROADCAST: '/broadcast',
-    };
-  }
-
-  constructor(backendClient: BackendClient) {
-    this.backendClient = backendClient;
-  }
+  constructor(private readonly apiClient = container.resolve(APIClient)) {}
 
   /**
    * Post an encrypted message to broadcast it.
@@ -47,23 +32,16 @@ export class BroadcastService {
    *
    * @param payload Payload to be posted
    * @param preconditionOption Level that backend checks for missing clients
-   * @returnsPromise that resolves when the message was sent
+   * @returns Promise that resolves when the message was sent
    */
-  postBroadcastMessage(
-    payload: {recipients: {}; sender: string},
-    preconditionOption: string[] | boolean,
-  ): Promise<UserClients> {
-    let url = `${BroadcastService.CONFIG.URL_BROADCAST}/otr/messages`;
-    if (Array.isArray(preconditionOption)) {
-      url = `${url}?report_missing=${preconditionOption.join(',')}`;
-    } else if (preconditionOption) {
-      url = `${url}?ignore_missing=true`;
+  postBroadcastMessage(payload: NewOTRMessage, preconditionOption: string[] | boolean): Promise<ClientMismatch> {
+    const reportMissing = Array.isArray(preconditionOption) ? preconditionOption : undefined;
+    const ignoreMissing = preconditionOption === true ? true : undefined;
+
+    if (reportMissing) {
+      payload.report_missing = reportMissing;
     }
 
-    return this.backendClient.sendJson({
-      data: payload,
-      type: 'POST',
-      url: url,
-    });
+    return this.apiClient.broadcast.api.postBroadcastMessage(payload.sender, payload, ignoreMissing);
   }
 }

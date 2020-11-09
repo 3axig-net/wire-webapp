@@ -17,7 +17,7 @@
  *
  */
 
-import {ClientType} from '@wireapp/api-client/dist/client/index';
+import {ClientType} from '@wireapp/api-client/src/client/index';
 import {ContainerXS, Loading} from '@wireapp/react-ui-kit';
 import React from 'react';
 import {connect} from 'react-redux';
@@ -47,7 +47,7 @@ const ClientList = ({
 }: Props & ConnectedProps & DispatchProps) => {
   const {history} = useReactRouter();
   const [showLoading, setShowLoading] = React.useState(false);
-  const [currentlySelectedClient, setCurrentlySelectedClient] = React.useState();
+  const [currentlySelectedClient, setCurrentlySelectedClient] = React.useState<string | null>(null);
 
   const setSelectedClient = (clientId: string) => {
     const isSelectedClient = currentlySelectedClient === clientId;

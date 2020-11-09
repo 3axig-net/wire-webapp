@@ -18,6 +18,7 @@
  */
 
 import {amplify} from 'amplify';
+
 import {resetStoreValue} from 'Util/StorageUtil';
 
 import {StorageKey} from '../storage/StorageKey';
@@ -25,7 +26,7 @@ import {StorageKey} from '../storage/StorageKey';
 export class CacheRepository {
   public static CACHE_KEY = {
     // Redefine name from "sw.js"
-    ASSETS: `asset: 'asset-cache-v2`,
+    ASSETS: `asset-cache-v3`,
   };
 
   // Caution! When refactoring this code, make sure that it works in an "beforeunload" scenario!
@@ -36,8 +37,8 @@ export class CacheRepository {
   /**
    * Deletes cached data.
    *
-   * @param keepConversationInput - Should conversation input be kept
-   * @param protectedKeyPatterns - Keys which should NOT be deleted from
+   * @param keepConversationInput Should conversation input be kept
+   * @param protectedKeyPatterns Keys which should NOT be deleted from
    *   the cache
    * @returns Keys which have been deleted from the cache
    */

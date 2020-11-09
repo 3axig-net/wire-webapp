@@ -17,41 +17,46 @@
  *
  */
 
+import {WebAppEvents} from '@wireapp/webapp-events';
+import {amplify} from 'amplify';
+import type Dexie from 'dexie';
+import ko from 'knockout';
+import {ClientClassification} from '@wireapp/api-client/src/client';
+
 import {t} from 'Util/LocalizerUtil';
 import {getLogger} from 'Util/Logger';
 import {capitalizeFirstChar} from 'Util/StringUtil';
 
-import {amplify} from 'amplify';
-import Dexie from 'dexie';
-import ko from 'knockout';
-import {ClientEntity} from '../client/ClientEntity';
-import {ClientRepository} from '../client/ClientRepository';
+import type {ClientEntity} from '../client/ClientEntity';
+import type {ClientRepository} from '../client/ClientRepository';
 import {Config} from '../Config';
-import {ConversationRepository} from '../conversation/ConversationRepository';
-import {CryptographyRepository} from '../cryptography/CryptographyRepository';
-import {User} from '../entity/User';
-import {WebAppEvents} from '../event/WebApp';
-import {getPrivacyHowUrl, getPrivacyWhyUrl} from '../externalRoute';
+import type {CryptographyRepository} from '../cryptography/CryptographyRepository';
+import type {User} from '../entity/User';
+import {getPrivacyHowUrl, getPrivacyWhyUrl, getPrivacyPolicyUrl} from '../externalRoute';
 import {MotionDuration} from '../motion/MotionDuration';
-
-import {ClientClassification} from '@wireapp/api-client/dist/client';
 import 'Components/deviceCard';
+import type {MessageRepository} from '../conversation/MessageRepository';
+import {container} from 'tsyringe';
+import {ClientState} from '../client/ClientState';
+import {ConversationState} from '../conversation/ConversationState';
 
 export interface UserDevicesHistory {
   current: ko.PureComputed<UserDevicesState>;
-  goTo: (to: UserDevicesState, head: string) => void;
   goBack: () => void;
+  goTo: (to: UserDevicesState, head: string) => void;
   headline: ko.PureComputed<string>;
   reset: () => void;
 }
 
 interface UserDevicesParams {
   clientRepository: ClientRepository;
-  conversationRepository: ConversationRepository;
+  clientState?: ClientState;
+  conversationState?: ConversationState;
   cryptographyRepository: CryptographyRepository;
-  userEntity: ko.Observable<User>;
   history: UserDevicesHistory;
+  messageRepository: MessageRepository;
   noPadding?: boolean;
+  userEntity: ko.Observable<User>;
 }
 
 enum FIND_MODE {
@@ -61,8 +66,8 @@ enum FIND_MODE {
 }
 
 export enum UserDevicesState {
-  DEVICE_LIST = 'UserDevices.DEVICE_LIST',
   DEVICE_DETAILS = 'UserDevices.DEVICE_DETAILS',
+  DEVICE_LIST = 'UserDevices.DEVICE_LIST',
   SELF_FINGERPRINT = 'UserDevices.SELF_FINGERPRINT',
 }
 
@@ -116,7 +121,7 @@ ko.components.register('user-devices', {
       <!-- ko if: showDevicesNotFound() -->
         <div class="participant-devices__header" data-bind="css: {'participant-devices__header--padding': !noPadding}">
           <div class="participant-devices__text-block panel__info-text" data-bind="text: noDevicesHeadlineText" data-uie-name="status-devices-headline"></div>
-          <a class="participant-devices__link" data-bind="text: t('participantDevicesLearnMore'), attr: {href: Config.URL.PRIVACY_POLICY}" rel="nofollow noopener noreferrer" target="_blank" class="accent-text"></a>
+          <a class="participant-devices__link" data-bind="text: t('participantDevicesLearnMore'), attr: {href: privacyPolicyUrl}" rel="nofollow noopener noreferrer" target="_blank" class="accent-text"></a>
         </div>
       <!-- /ko -->
 
@@ -159,19 +164,24 @@ ko.components.register('user-devices', {
       <!-- /ko -->
     </div>
   `,
-  viewModel: function({
+  viewModel: function ({
     clientRepository,
-    conversationRepository,
     cryptographyRepository,
+    messageRepository,
     userEntity,
     history,
     noPadding = false,
+    clientState = container.resolve(ClientState),
+    conversationState = container.resolve(ConversationState),
   }: UserDevicesParams): void {
-    this.selfClient = clientRepository.currentClient;
+    this.clientState = clientState;
+    this.conversationState = conversationState;
+
+    this.selfClient = clientState.currentClient;
     this.clientEntities = ko.observableArray();
-    this.Config = Config;
     this.noPadding = noPadding;
 
+    const brandName = Config.getConfig().BRAND_NAME;
     const logger = getLogger('UserDevices');
 
     this.isResettingSession = ko.observable(false);
@@ -179,6 +189,7 @@ ko.components.register('user-devices', {
     this.fingerprintRemote = ko.observableArray([]);
     this.deviceMode = ko.observable(FIND_MODE.REQUESTING);
     this.selectedClient = ko.observable();
+    this.privacyPolicyUrl = getPrivacyPolicyUrl();
     this.privacyHowUrl = getPrivacyHowUrl();
     this.privacyWhyUrl = getPrivacyWhyUrl();
 
@@ -201,20 +212,18 @@ ko.components.register('user-devices', {
       });
 
     this.detailMessage = ko.pureComputed(() => {
-      return userEntity() ? t('participantDevicesDetailHeadline', {user: userEntity().first_name()}) : '';
+      return userEntity() ? t('participantDevicesDetailHeadline', {user: userEntity().name()}) : '';
     });
 
     this.devicesHeadlineText = ko.pureComputed(() => {
-      return userEntity()
-        ? t('participantDevicesHeadline', {brandName: Config.BRAND_NAME, user: userEntity().first_name()})
-        : '';
+      return userEntity() ? t('participantDevicesHeadline', {brandName, user: userEntity().name()}) : '';
     });
 
     this.noDevicesHeadlineText = ko.pureComputed(() => {
       return userEntity()
         ? t('participantDevicesOutdatedClientMessage', {
-            brandName: Config.BRAND_NAME,
-            user: userEntity().first_name(),
+            brandName,
+            user: userEntity().name(),
           })
         : '';
     });
@@ -231,7 +240,7 @@ ko.components.register('user-devices', {
 
     this.clickOnDevice = (clientEntity: ClientEntity) => {
       this.selectedClient(clientEntity);
-      const headline = userEntity().is_me
+      const headline = userEntity().isMe
         ? this.selectedClient().label || this.selectedClient().model
         : capitalizeFirstChar(this.selectedClient().class);
       history.goTo(UserDevicesState.DEVICE_DETAILS, headline);
@@ -241,11 +250,11 @@ ko.components.register('user-devices', {
 
     this.clickToResetSession = () => {
       const _resetProgress = () => window.setTimeout(() => this.isResettingSession(false), MotionDuration.LONG);
-      const conversationId = userEntity().is_me
-        ? conversationRepository.self_conversation().id
-        : conversationRepository.active_conversation().id;
+      const conversationId = userEntity().isMe
+        ? conversationState.self_conversation().id
+        : conversationState.activeConversation().id;
       this.isResettingSession(true);
-      conversationRepository
+      messageRepository
         .reset_session(userEntity().id, this.selectedClient().id, conversationId)
         .then(_resetProgress)
         .catch(_resetProgress);

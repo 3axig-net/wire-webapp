@@ -17,7 +17,8 @@
  *
  */
 
-import {ConversationEvent} from '@wireapp/api-client/dist/event';
+import type {ConversationEvent} from '@wireapp/api-client/src/event';
+
 import {actionRoot} from '.';
 import {mockStoreFactory} from '../../util/test/mockStoreFactory';
 import {ConversationActionCreator} from './creator';
@@ -38,6 +39,7 @@ describe('ConversationAction', () => {
       core: mockedCore,
     })({});
     await store.dispatch(actionRoot.conversationAction.doCheckConversationCode(key, code));
+
     expect(store.getActions()).toEqual([
       ConversationActionCreator.startConversationCodeCheck(),
       ConversationActionCreator.successfulConversationCodeCheck(),
@@ -45,7 +47,7 @@ describe('ConversationAction', () => {
   });
 
   it('handles failed join conversation code check', async () => {
-    const error = new Error('testerror');
+    const error = new Error('test error');
     const key = 'key';
     const code = 'code';
     const mockedActions = {};
@@ -86,6 +88,7 @@ describe('ConversationAction', () => {
       core: mockedCore,
     })({});
     await store.dispatch(actionRoot.conversationAction.doJoinConversationByCode(key, code));
+
     expect(store.getActions()).toEqual([
       ConversationActionCreator.startJoinConversationByCode(),
       ConversationActionCreator.successfulJoinConversationByCode(conversationEvent),
@@ -93,7 +96,7 @@ describe('ConversationAction', () => {
   });
 
   it('handles failed join conversation by code', async () => {
-    const error = new Error('testerror');
+    const error = new Error('test error');
     const key = 'key';
     const code = 'code';
     const mockedActions = {};

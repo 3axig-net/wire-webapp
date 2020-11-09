@@ -17,58 +17,28 @@
  *
  */
 
-import {Logger, getLogger} from 'Util/Logger';
+import type {Provider, Service} from '@wireapp/api-client/src/team/service';
+import {container} from 'tsyringe';
 
-import {BackendClient} from '../service/BackendClient';
+import {APIClient} from '../service/APIClientSingleton';
 
 export class IntegrationService {
-  static URL = {
-    PROVIDERS: '/providers',
-    SERVICES: '/services',
-  };
-  backendClient: BackendClient;
-  logger: Logger;
+  constructor(private readonly apiClient = container.resolve(APIClient)) {}
 
-  /**
-   * Construct a new Integration Service.
-   * @param backendClient - Client for the API calls
-   */
-  constructor(backendClient: BackendClient) {
-    this.backendClient = backendClient;
-    this.logger = getLogger('IntegrationService');
+  getProvider(providerId: string): Promise<Provider> {
+    return this.apiClient.teams.service.api.getProvider(providerId);
   }
 
-  getProvider(providerId: string): Promise<any> {
-    return this.backendClient.sendRequest({
-      type: 'GET',
-      url: `${IntegrationService.URL.PROVIDERS}/${providerId}`,
-    });
+  async getProviderServices(providerId: string): Promise<Service[]> {
+    const servicesChunk = await this.apiClient.teams.service.api.getProviderServices(providerId);
+    return servicesChunk.services;
   }
 
-  getProviderServices(providerId: string): Promise<any> {
-    return this.backendClient.sendRequest({
-      type: 'GET',
-      url: `${IntegrationService.URL.PROVIDERS}/${providerId}${IntegrationService.URL.SERVICES}`,
-    });
-  }
-
-  getService(providerId: string, serviceId: string): Promise<any> {
-    return this.backendClient.sendRequest({
-      type: 'GET',
-      url: `${IntegrationService.URL.PROVIDERS}/${providerId}${IntegrationService.URL.SERVICES}/${serviceId}`,
-    });
+  getService(providerId: string, serviceId: string): Promise<Service> {
+    return this.apiClient.teams.service.api.getService(providerId, serviceId);
   }
 
   getServices(tags: string[] | string, start: string): Promise<any> {
-    const params: Record<string, string[] | string> = {tags};
-    if (start) {
-      params.start = start;
-    }
-
-    return this.backendClient.sendRequest({
-      data: params,
-      type: 'GET',
-      url: IntegrationService.URL.SERVICES,
-    });
+    return this.apiClient.teams.service.api.getServices(undefined, start, tags);
   }
 }

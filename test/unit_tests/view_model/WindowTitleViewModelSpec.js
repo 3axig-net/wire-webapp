@@ -18,8 +18,10 @@
  */
 
 import ko from 'knockout';
+import {WebAppEvents} from '@wireapp/webapp-events';
+import {CONVERSATION_TYPE} from '@wireapp/api-client/src/conversation';
 
-import {t} from 'Util/LocalizerUtil';
+import {t, setStrings} from 'Util/LocalizerUtil';
 import {createRandomUuid} from 'Util/util';
 
 import 'src/script/localization/Localizer';
@@ -29,30 +31,28 @@ import {ContentMessage} from 'src/script/entity/message/ContentMessage';
 import {User} from 'src/script/entity/User';
 
 import {NOTIFICATION_STATE} from 'src/script/conversation/NotificationSetting';
-import {ConversationType} from 'src/script/conversation/ConversationType';
 import {WindowTitleViewModel} from 'src/script/view_model/WindowTitleViewModel';
 import {ContentViewModel} from 'src/script/view_model/ContentViewModel';
-import {WebAppEvents} from 'src/script/event/WebApp';
+import {TestFactory} from '../../helper/TestFactory';
 
 describe('WindowTitleViewModel', () => {
   const suffix = 'Wire';
-  let test_factory = undefined;
+  let testFactory = undefined;
   let title_view_model = undefined;
 
   beforeEach(() => {
-    test_factory = new TestFactory();
+    setStrings({en: z.string});
+    testFactory = new TestFactory();
 
-    return test_factory.exposeConversationActors().then(conversationRepository => {
+    return testFactory.exposeConversationActors().then(conversationRepository => {
       title_view_model = new WindowTitleViewModel(
         {
           content: {
             state: ko.observable(ContentViewModel.STATE.CONVERSATION),
           },
         },
-        {
-          conversation: conversationRepository,
-          user: TestFactory.user_repository,
-        },
+        testFactory.user_repository.userState,
+        conversationRepository.conversationState,
       );
     });
   });
@@ -72,8 +72,8 @@ describe('WindowTitleViewModel', () => {
     it('sets the name of the conversation (when the conversation is selected)', () => {
       const selected_conversation = new Conversation(createRandomUuid());
       selected_conversation.name('Selected Conversation');
-      selected_conversation.type(ConversationType.GROUP);
-      title_view_model.conversationRepository.active_conversation(selected_conversation);
+      selected_conversation.type(CONVERSATION_TYPE.REGULAR);
+      title_view_model.conversationState.activeConversation(selected_conversation);
 
       const expected_title = `${selected_conversation.name()} · ${suffix}`;
       title_view_model.initiateTitleUpdates();
@@ -89,11 +89,11 @@ describe('WindowTitleViewModel', () => {
       const conversationEntity = new Conversation(createRandomUuid());
       conversationEntity.add_message(message);
       conversationEntity.name('Birthday Bash');
-      conversationEntity.type(ConversationType.GROUP);
+      conversationEntity.type(CONVERSATION_TYPE.REGULAR);
       conversationEntity.selfUser(new User(createRandomUuid()));
 
-      title_view_model.conversationRepository.conversations_unarchived.push(conversationEntity);
-      title_view_model.conversationRepository.active_conversation(conversationEntity);
+      title_view_model.conversationState.conversations_unarchived.push(conversationEntity);
+      title_view_model.conversationState.activeConversation(conversationEntity);
       title_view_model.initiateTitleUpdates();
 
       const expected_title = `(1) ${conversationEntity.name()} · ${suffix}`;
@@ -107,23 +107,23 @@ describe('WindowTitleViewModel', () => {
 
       const selected_conversation = new Conversation(createRandomUuid());
       selected_conversation.name('Selected Conversation');
-      selected_conversation.type(ConversationType.GROUP);
+      selected_conversation.type(CONVERSATION_TYPE.REGULAR);
       selected_conversation.selfUser(selfUserEntity);
-      title_view_model.conversationRepository.active_conversation(selected_conversation);
+      title_view_model.conversationState.activeConversation(selected_conversation);
 
       const muted_conversation = new Conversation(createRandomUuid());
       muted_conversation.mutedState(NOTIFICATION_STATE.NOTHING);
       muted_conversation.name('Muted Conversation');
-      muted_conversation.type(ConversationType.GROUP);
+      muted_conversation.type(CONVERSATION_TYPE.REGULAR);
       muted_conversation.selfUser(selfUserEntity);
 
       // Add conversations to conversation repository
-      expect(title_view_model.conversationRepository.conversations_unarchived().length).toBe(0);
+      expect(title_view_model.conversationState.conversations_unarchived().length).toBe(0);
 
-      title_view_model.conversationRepository.conversations_unarchived.push(selected_conversation);
-      title_view_model.conversationRepository.conversations_unarchived.push(muted_conversation);
+      title_view_model.conversationState.conversations_unarchived.push(selected_conversation);
+      title_view_model.conversationState.conversations_unarchived.push(muted_conversation);
 
-      expect(title_view_model.conversationRepository.conversations_unarchived().length).toBe(2);
+      expect(title_view_model.conversationState.conversations_unarchived().length).toBe(2);
 
       // Check title when there are no messages
       title_view_model.initiateTitleUpdates();
@@ -215,7 +215,7 @@ describe('WindowTitleViewModel', () => {
 
     it('shows the number of connection requests when viewing the inbox', () => {
       title_view_model.contentState(ContentViewModel.STATE.CONNECTION_REQUESTS);
-      title_view_model.userRepository.connect_requests = ko.observableArray([]);
+      title_view_model.userState.connectRequests = ko.observableArray([]);
 
       const firstConnectedUser = new User(createRandomUuid());
       const secondConnectedUser = new User(createRandomUuid());
@@ -239,7 +239,7 @@ describe('WindowTitleViewModel', () => {
       title_view_model.initiateTitleUpdates();
 
       tests.forEach(({connections, expected}) => {
-        title_view_model.userRepository.connect_requests(connections);
+        title_view_model.userState.connectRequests(connections);
         jasmine.clock().tick(WindowTitleViewModel.TITLE_DEBOUNCE);
 
         expect(window.document.title).toBe(expected);
@@ -254,7 +254,7 @@ describe('WindowTitleViewModel', () => {
       const conversationEntity = new Conversation(createRandomUuid());
       conversationEntity.add_message(contentMessage);
       conversationEntity.name('Birthday Bash');
-      conversationEntity.type(ConversationType.GROUP);
+      conversationEntity.type(CONVERSATION_TYPE.REGULAR);
       conversationEntity.selfUser(new User(createRandomUuid()));
 
       amplify.subscribe(WebAppEvents.LIFECYCLE.UNREAD_COUNT, badgeCount => {
@@ -262,8 +262,8 @@ describe('WindowTitleViewModel', () => {
         done();
       });
 
-      title_view_model.conversationRepository.conversations_unarchived.push(conversationEntity);
-      title_view_model.conversationRepository.active_conversation(conversationEntity);
+      title_view_model.conversationState.conversations_unarchived.push(conversationEntity);
+      title_view_model.conversationState.activeConversation(conversationEntity);
 
       title_view_model.initiateTitleUpdates();
     });

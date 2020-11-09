@@ -22,7 +22,8 @@ import {escape} from 'underscore';
 import {Declension, t} from 'Util/LocalizerUtil';
 import {prependProtocol} from 'Util/UrlUtil';
 import {isValidEmail} from 'Util/ValidationUtil';
-import {User} from '../entity/User';
+
+import type {User} from '../entity/User';
 
 export const escapeRegex = (string: string): string => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -36,11 +37,11 @@ export const getSelfName = (declension = Declension.NOMINATIVE, bypassSanitizati
   return bypassSanitization ? selfName : escape(selfName);
 };
 
-export const getFirstName = (userEntity: User, declension: string, bypassSanitization: boolean = false): string => {
-  if (userEntity.is_me) {
+export const getUserName = (userEntity: User, declension: string, bypassSanitization: boolean = false): string => {
+  if (userEntity.isMe) {
     return getSelfName(declension, bypassSanitization);
   }
-  return bypassSanitization ? userEntity.first_name() : escape(userEntity.first_name());
+  return bypassSanitization ? userEntity.name() : escape(userEntity.name());
 };
 
 /**

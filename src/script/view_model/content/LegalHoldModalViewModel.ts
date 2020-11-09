@@ -17,20 +17,25 @@
  *
  */
 
-import {LegalHoldMemberStatus} from '@wireapp/api-client/dist/team/legalhold';
+import {LegalHoldMemberStatus} from '@wireapp/api-client/src/team/legalhold';
 import {amplify} from 'amplify';
-import {UserDevicesHistory, UserDevicesState, makeUserDevicesHistory} from 'Components/userDevices';
+import {StatusCodes as HTTP_STATUS} from 'http-status-codes';
+
 import ko from 'knockout';
-import {ClientRepository} from 'src/script/client/ClientRepository';
-import {ConversationRepository} from 'src/script/conversation/ConversationRepository';
-import {CryptographyRepository} from 'src/script/cryptography/CryptographyRepository';
-import {Conversation} from 'src/script/entity/Conversation';
-import {User} from 'src/script/entity/User';
-import {TeamRepository} from 'src/script/team/TeamRepository';
-import {UserRepository} from 'src/script/user/UserRepository';
+import {WebAppEvents} from '@wireapp/webapp-events';
+
+import {UserDevicesHistory, UserDevicesState, makeUserDevicesHistory} from 'Components/userDevices';
 import {t} from 'Util/LocalizerUtil';
-import {BackendClientError} from '../../error/BackendClientError';
-import {WebAppEvents} from '../../event/WebApp';
+
+import type {ClientRepository} from 'src/script/client/ClientRepository';
+import type {ConversationRepository} from 'src/script/conversation/ConversationRepository';
+import type {CryptographyRepository} from 'src/script/cryptography/CryptographyRepository';
+import type {Conversation} from 'src/script/entity/Conversation';
+import type {User} from 'src/script/entity/User';
+import type {TeamRepository} from 'src/script/team/TeamRepository';
+import type {MessageRepository} from 'src/script/conversation/MessageRepository';
+import {UserState} from '../../user/UserState';
+import {container} from 'tsyringe';
 
 export const SHOW_REQUEST_MODAL = 'LegalHold.showRequestModal';
 export const HIDE_REQUEST_MODAL = 'LegalHold.hideRequestModal';
@@ -58,11 +63,12 @@ export class LegalHoldModalViewModel {
   conversationId: string;
 
   constructor(
-    public userRepository: UserRepository,
     public conversationRepository: ConversationRepository,
     public teamRepository: TeamRepository,
     public clientRepository: ClientRepository,
     public cryptographyRepository: CryptographyRepository,
+    public messageRepository: MessageRepository,
+    private readonly userState = container.resolve(UserState),
   ) {
     this.isVisible = ko.observable(false);
     this.showRequest = ko.observable(false);
@@ -111,7 +117,7 @@ export class LegalHoldModalViewModel {
     if (showLoading) {
       setModalParams(true);
     }
-    const selfUser = this.userRepository.self();
+    const selfUser = this.userState.self();
     this.requiresPassword(!selfUser.isSingleSignOn);
     if (!selfUser.inTeam()) {
       setModalParams(false);
@@ -133,9 +139,9 @@ export class LegalHoldModalViewModel {
     }
     this.isVisible(true);
     this.isLoading(false);
-    const formatedFingerprint = fingerprint.map(part => `<span>${part} </span>`).join('');
+    const formattedFingerprint = fingerprint.map(part => `<span>${part} </span>`).join('');
     this.requestFingerprint(
-      `<span class="legal-hold-modal__fingerprint" data-uie-name="status-modal-fingerprint">${formatedFingerprint}</span>`,
+      `<span class="legal-hold-modal__fingerprint" data-uie-name="status-modal-fingerprint">${formattedFingerprint}</span>`,
     );
   };
 
@@ -161,7 +167,7 @@ export class LegalHoldModalViewModel {
     if (this.disableSubmit()) {
       return;
     }
-    const selfUser = this.userRepository.self();
+    const selfUser = this.userState.self();
     this.requestError('');
     this.isSendingApprove(true);
     try {
@@ -175,11 +181,11 @@ export class LegalHoldModalViewModel {
       amplify.publish(WebAppEvents.USER.CLIENT_ADDED, selfUser.id);
     } catch ({code, message}) {
       switch (code) {
-        case BackendClientError.STATUS_CODE.BAD_REQUEST: {
+        case HTTP_STATUS.BAD_REQUEST: {
           this.requestError(t('BackendError.LABEL.BAD_REQUEST'));
           break;
         }
-        case BackendClientError.STATUS_CODE.FORBIDDEN: {
+        case HTTP_STATUS.FORBIDDEN: {
           this.requestError(t('BackendError.LABEL.ACCESS_DENIED'));
           break;
         }
@@ -197,7 +203,7 @@ export class LegalHoldModalViewModel {
     }
     this.showRequest(false);
     if (conversation === undefined) {
-      this.users([this.userRepository.self()]);
+      this.users([this.userState.self()]);
       this.isSelfInfo(true);
       this.isLoading(false);
       this.isVisible(true);
@@ -208,8 +214,8 @@ export class LegalHoldModalViewModel {
     this.isSelfInfo(false);
     this.isLoading(true);
     this.isVisible(true);
-    await this.conversationRepository.updateAllClients(conversation, false);
-    const allUsers = await this.conversationRepository.get_all_users_in_conversation(conversation.id);
+    await this.messageRepository.updateAllClients(conversation, false);
+    const allUsers = await this.conversationRepository.getAllUsersInConversation(conversation.id);
     const legalHoldUsers = allUsers.filter(user => user.isOnLegalHold());
     if (!legalHoldUsers.length) {
       this.isVisible(false);
@@ -231,7 +237,7 @@ export class LegalHoldModalViewModel {
     this.devicesUser(undefined);
   };
 
-  handleInputKey = (_data: LegalHoldModalViewModel, {key}: JQuery.Event): boolean => {
+  handleInputKey = (_data: LegalHoldModalViewModel, {key}: JQuery.Event<HTMLElement, KeyboardEvent>): boolean => {
     if (key !== 'Enter') {
       return true;
     }

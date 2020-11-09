@@ -17,12 +17,15 @@
  *
  */
 
-import {backendConfig} from '../../api/testResolver';
+import {StatusCodes as HTTP_STATUS} from 'http-status-codes';
+
+import {Config} from 'src/script/Config';
+import {TestFactory} from '../../helper/TestFactory';
 
 describe('TeamRepository', () => {
-  const test_factory = new TestFactory();
+  const testFactory = new TestFactory();
 
-  /* eslint sort-keys: "off" */
+  /* eslint sort-keys-fix/sort-keys-fix: "off" */
   const teams_data = {
     teams: [
       {
@@ -50,34 +53,47 @@ describe('TeamRepository', () => {
       {user: '74fa64dc-8318-4426-9935-82590ff8aa3e', permissions: 8},
     ],
   };
-  /* eslint sort-keys: "off" */
+  /* eslint sort-keys-fix/sort-keys-fix: "off" */
 
   let server = undefined;
   let team_repository = undefined;
 
-  beforeAll(() => test_factory.exposeTeamActors().then(repository => (team_repository = repository)));
+  beforeAll(() => testFactory.exposeTeamActors().then(repository => (team_repository = repository)));
 
   beforeEach(() => {
     server = sinon.fakeServer.create();
     server.autoRespond = true;
 
-    server.respondWith('GET', `${backendConfig.restUrl}/teams?size=100`, [
-      200,
+    server.respondWith('GET', `${Config.getConfig().BACKEND_REST}/teams`, [
+      HTTP_STATUS.OK,
       {'Content-Type': 'application/json'},
       JSON.stringify(teams_data),
     ]);
 
-    server.respondWith('GET', `${backendConfig.restUrl}/teams/${team_metadata.id}/members`, [
-      200,
+    server.respondWith('GET', `${Config.getConfig().BACKEND_REST}/teams/${team_metadata.id}/members`, [
+      HTTP_STATUS.OK,
       {'Content-Type': 'application/json'},
       JSON.stringify(team_members),
     ]);
+
+    server.respondWith(
+      'POST',
+      `${Config.getConfig().BACKEND_REST}/teams/${team_metadata.id}/get-members-by-ids-using-post`,
+      [HTTP_STATUS.OK, {'Content-Type': 'application/json'}, JSON.stringify(team_members)],
+    );
+
+    server.respondWith(
+      'GET',
+      `${Config.getConfig().BACKEND_REST}/users?ids=${team_members.members.map(member => member.user).join(',')}`,
+      [HTTP_STATUS.OK, {'Content-Type': 'application/json'}, ''],
+    );
   });
 
   afterEach(() => server.restore());
 
   describe('getTeam()', () => {
     it('returns the binding team entity', () => {
+      spyOn(team_repository.userState, 'self').and.returnValue({id: 'self-id'});
       return team_repository.getTeam().then(team_et => {
         const [team_data] = teams_data.teams;
 
@@ -87,9 +103,9 @@ describe('TeamRepository', () => {
     });
   });
 
-  describe('getTeamMembers()', () => {
+  describe('getAllTeamMembers()', () => {
     it('returns team member entities', () => {
-      return team_repository.getTeamMembers(team_metadata.id).then(entities => {
+      return team_repository.getAllTeamMembers(team_metadata.id).then(entities => {
         expect(entities.length).toEqual(team_members.members.length);
         expect(entities[0].userId).toEqual(team_members.members[0].user);
         expect(entities[0].permissions).toEqual(team_members.members[0].permissions);
@@ -99,10 +115,14 @@ describe('TeamRepository', () => {
 
   describe('sendAccountInfo', () => {
     it(`doesn't crash when there is no team logo`, async () => {
-      expect(team_repository.isTeam()).toBe(true);
+      expect(team_repository.teamState.isTeam()).toBe(true);
 
-      team_repository.selfUser().getIconResource = async () => ({
-        load: async () => undefined,
+      spyOn(team_repository.userState, 'self').and.returnValue({
+        accent_id: () => 2,
+        teamRole: () => 'z.team.TeamRole.ROLE.NONE',
+        getIconResource: async () => ({
+          load: async () => undefined,
+        }),
       });
 
       const accountInfo = await team_repository.sendAccountInfo(true);

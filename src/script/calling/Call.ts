@@ -19,10 +19,10 @@
 
 import {CALL_TYPE, CONV_TYPE, STATE as CALL_STATE} from '@wireapp/avs';
 import ko from 'knockout';
-import {Participant} from './Participant';
+
+import type {Participant, UserId, ClientId} from './Participant';
 
 export type ConversationId = string;
-export type UserId = string;
 
 export class Call {
   public readonly conversationId: ConversationId;
@@ -31,16 +31,29 @@ export class Call {
   public readonly startedAt: ko.Observable<number | undefined>;
   public readonly state: ko.Observable<CALL_STATE>;
   public readonly participants: ko.ObservableArray<Participant>;
-  public readonly selfParticipant: Participant;
+  public readonly selfClientId: ClientId;
   public readonly conversationType: CONV_TYPE;
   public readonly initialType: CALL_TYPE;
+  public readonly isCbrEnabled: ko.Observable<boolean>;
   public blockMessages: boolean = false;
+  /**
+   * set to `true` if anyone has enabled their video during a call (used for analytics)
+   */
+  public analyticsAvSwitchToggle: boolean = false;
+  /**
+   * set to `true` if anyone has shared their screen during a call (used for analytics)
+   */
+  public analyticsScreenSharing: boolean = false;
+  /**
+   * Maximum number of people joined in a call (used for analytics)
+   */
+  public analyticsMaximumParticipants: number = 0;
 
   constructor(
     initiator: UserId,
     conversationId: ConversationId,
     conversationType: CONV_TYPE,
-    selfParticipant: Participant,
+    private readonly selfParticipant: Participant,
     callType: CALL_TYPE,
   ) {
     this.initiator = initiator;
@@ -48,9 +61,34 @@ export class Call {
     this.state = ko.observable(CALL_STATE.UNKNOWN);
     this.conversationType = conversationType;
     this.initialType = callType;
-    this.selfParticipant = selfParticipant;
-    this.participants = ko.observableArray();
+    this.selfClientId = selfParticipant?.clientId;
+    this.participants = ko.observableArray([selfParticipant]);
     this.reason = ko.observable();
     this.startedAt = ko.observable();
+    this.isCbrEnabled = ko.observable(false);
+  }
+
+  get hasWorkingAudioInput(): boolean {
+    return !!this.selfParticipant.audioStream();
+  }
+
+  getSelfParticipant(): Participant {
+    return this.participants().find(({user, clientId}) => user.isMe && this.selfClientId === clientId);
+  }
+
+  addParticipant(participant: Participant): void {
+    this.participants.push(participant);
+  }
+
+  getParticipant(userId: UserId, clientId: ClientId): Participant | undefined {
+    return this.participants().find(participant => participant.doesMatchIds(userId, clientId));
+  }
+
+  getRemoteParticipants(): Participant[] {
+    return this.participants().filter(({user, clientId}) => !user.isMe || this.selfClientId !== clientId);
+  }
+
+  removeParticipant(participant: Participant): void {
+    this.participants.remove(participant);
   }
 }

@@ -17,18 +17,12 @@
  *
  */
 
-import {t} from 'Util/LocalizerUtil';
 import {includesString} from 'Util/StringUtil';
 
 export const appendParameter = (url: string, parameter: string) => {
   const separator = includesString(url, '?') ? '&' : '?';
   return `${url}${separator}${parameter}`;
 };
-
-export const buildSupportUrl = (supportId: string) =>
-  typeof supportId === 'number'
-    ? `${window.wire.env.URL.SUPPORT_BASE}${t('urlSupportArticles')}${supportId}`
-    : `${window.wire.env.URL.SUPPORT_BASE}${t('urlSupportRequests')}`;
 
 export const getParameter = (parameterName: string, locationSearch = window.location.search) => {
   const searchParameters = locationSearch.substring(1).split('&');
@@ -79,7 +73,7 @@ export const getDomainName = (url = '') => {
   }
 };
 
-export const getLinksFromHtml = (html: string) => {
+export const getLinksFromHtml = <T extends HTMLElement>(html: string): T[] => {
   if (!html) {
     return [];
   }
@@ -88,11 +82,11 @@ export const getLinksFromHtml = (html: string) => {
   const links = html.match(anchorTags);
 
   const hasLinks = links?.length;
-  return hasLinks ? links.map(element => $(element)[0]) : [];
+  return hasLinks ? links.map(element => $<T>(element)[0]) : [];
 };
 
 /**
- * Prepends http to given url if protocol missing
+ * Prepends "http" to given URL if protocol is missing
  * @param url URL to be prepended
  * @returns prepended URL
  */

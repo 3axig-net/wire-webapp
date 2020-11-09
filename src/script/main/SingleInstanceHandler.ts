@@ -19,8 +19,8 @@
 
 import Cookies from 'js-cookie';
 
-import {Environment} from 'Util/Environment';
 import {TIME_IN_MILLIS} from 'Util/TimeUtil';
+import {Runtime} from '@wireapp/commons';
 
 let checkIntervalId = 0;
 
@@ -38,7 +38,7 @@ export class SingleInstanceHandler {
 
   /**
    * @param onOtherInstanceStarted A callback to be called if another instance starts.
-   * If provided, will also run an interval that checks the instance integrity once an instance is registrated
+   * If provided, will also run an interval that checks the instance integrity once an instance is registered
    */
   constructor(onOtherInstanceStarted?: () => void) {
     this.instanceId = undefined;
@@ -46,7 +46,7 @@ export class SingleInstanceHandler {
   }
 
   /**
-   * Set the cookie to verify we are running a single instace tab.
+   * Set the cookie to verify we are running a single instance tab.
    * Returns `true` if the instance has been registered successfully.
    * Returns `false` if the app is already running in another instance.
    *
@@ -61,7 +61,13 @@ export class SingleInstanceHandler {
     if (!!Cookies.get(cookieName)) {
       return false;
     }
-    Cookies.set(cookieName, {appInstanceId: this.instanceId});
+    Cookies.set(
+      cookieName,
+      {appInstanceId: this.instanceId},
+      {
+        sameSite: 'Lax',
+      },
+    );
     if (this.onOtherInstanceStarted) {
       this._startSingleInstanceCheck();
     }
@@ -101,7 +107,7 @@ export class SingleInstanceHandler {
   }
 
   private _isSingleRunningInstance(): boolean {
-    if (Environment.electron) {
+    if (Runtime.isDesktopApp()) {
       return true;
     }
     const singleInstanceCookie = Cookies.getJSON(CONFIG.COOKIE_NAME);

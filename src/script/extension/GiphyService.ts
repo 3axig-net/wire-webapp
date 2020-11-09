@@ -17,82 +17,54 @@
  *
  */
 
-import {BackendClient} from '../service/BackendClient';
-import {GiphyGif, GiphyResult} from './GiphyResult';
+import type {
+  GiphySearchOptions,
+  GiphyMultipleResult,
+  GiphyResult,
+  GiphyTrendingOptions,
+} from '@wireapp/api-client/src/giphy';
+import {container} from 'tsyringe';
 
-export enum GiphySorting {
-  RECENT = 'recent',
-  RELEVANT = 'relevant',
-}
-
-export interface GiphySearchOptions {
-  /** Search query term or phrase */
-  q: string;
-  /** Number of results to return (maximum 100). Default is 25. */
-  limit?: number;
-  /** Results offset. Default is 0. */
-  offset?: number;
-  /** Specify sorting ('relevant' or 'recent'). Default is "relevant". */
-  sort?: GiphySorting;
-}
+import {APIClient} from '../service/APIClientSingleton';
 
 export class GiphyService {
-  private readonly backendClient: BackendClient;
-
-  static CONFIG = {
-    ENDPOINT_BASE: '/proxy/giphy/v1/gifs',
-  };
+  constructor(private readonly apiClient = container.resolve(APIClient)) {}
 
   /**
-   * @param backendClient Client for the API calls
+   * Get GIFs for an ID
+   * @param ids A single id to fetch GIF data
    */
-  constructor(backendClient: BackendClient) {
-    this.backendClient = backendClient;
+  getById(id: string): Promise<GiphyResult> {
+    return this.apiClient.giphy.api.getGiphyById(id);
   }
 
   /**
-   * Get GIFs for IDs.
-   * @param ids A single id or comma separated list of IDs to fetch GIF size data
-   * @returns Resolves with the size data
+   * Get GIFs for IDs
+   * @param ids Multiple IDs to fetch GIF data
    */
-  getById(ids: string | string[]): Promise<GiphyResult<GiphyGif>> {
-    ids = [].concat(ids);
-
-    return this.backendClient.sendRequest({
-      type: 'GET',
-      url: `${GiphyService.CONFIG.ENDPOINT_BASE}/${ids.join(',')}`,
-    });
+  getByIds(ids: string[]): Promise<GiphyMultipleResult> {
+    return this.apiClient.giphy.api.getGiphyByIds({ids});
   }
 
   /**
-   * Search all Giphy GIFs for a word or phrase.
+   * Get a random Giphy GIF.
    * @param tag GIF tag to limit randomness by
-   * @returns Resolves with random gifs for given tag
    */
-  getRandom(tag: string): Promise<GiphyResult<GiphyGif>> {
-    return this.backendClient.sendRequest({
-      data: {
-        tag,
-      },
-      type: 'GET',
-      url: `${GiphyService.CONFIG.ENDPOINT_BASE}/random`,
-    });
+  getRandom(tag: string): Promise<GiphyResult> {
+    return this.apiClient.giphy.api.getGiphyRandom({tag});
   }
 
   /**
    * Search GIFs for a word or phrase.
-   * @returns Resolves with matches
    */
-  getSearch(options: GiphySearchOptions): Promise<GiphyResult<GiphyGif[]>> {
-    return this.backendClient.sendRequest({
-      data: {
-        limit: 25,
-        offset: 0,
-        sort: GiphySorting.RELEVANT,
-        ...options,
-      },
-      type: 'GET',
-      url: `${GiphyService.CONFIG.ENDPOINT_BASE}/search`,
-    });
+  getSearch(options: GiphySearchOptions): Promise<GiphyMultipleResult> {
+    return this.apiClient.giphy.api.getGiphySearch(options);
+  }
+
+  /**
+   * Search GIFs for a word or phrase.
+   */
+  getTrending(options: GiphyTrendingOptions): Promise<GiphyMultipleResult> {
+    return this.apiClient.giphy.api.getGiphyTrending(options);
   }
 }

@@ -18,18 +18,18 @@
  */
 
 import {Logger, getLogger} from 'Util/Logger';
+import {container} from 'tsyringe';
 
 import {StorageSchemata} from '../storage/StorageSchemata';
 import {StorageService} from './StorageService';
+import {StorageError} from '../error/StorageError';
 
 type AmplifyRecord = {key: string; value: string};
 
 export class StorageRepository {
   private readonly AMPLIFY_STORE_NAME: string;
   private readonly logger: Logger;
-  private readonly storageService: StorageService;
 
-  // tslint:disable-next-line:typedef
   static get CONFIG() {
     return {
       CRYPTOGRAPHY_TABLES: [
@@ -42,8 +42,7 @@ export class StorageRepository {
     };
   }
 
-  constructor(storageService: StorageService) {
-    this.storageService = storageService;
+  constructor(public readonly storageService = container.resolve(StorageService)) {
     this.logger = getLogger('StorageRepository');
     this.AMPLIFY_STORE_NAME = StorageSchemata.OBJECT_STORE.AMPLIFY;
   }
@@ -68,7 +67,7 @@ export class StorageRepository {
       if (record?.value) {
         return record.value;
       }
-      throw new z.error.StorageError(z.error.StorageError.TYPE.NOT_FOUND);
+      throw new StorageError(StorageError.TYPE.NOT_FOUND, StorageError.MESSAGE.NOT_FOUND);
     });
   }
 

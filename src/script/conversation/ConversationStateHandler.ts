@@ -17,23 +17,21 @@
  *
  */
 
+import {CONVERSATION_ACCESS, CONVERSATION_ACCESS_ROLE} from '@wireapp/api-client/src/conversation';
+import {CONVERSATION_EVENT} from '@wireapp/api-client/src/event';
 import {amplify} from 'amplify';
+import {WebAppEvents} from '@wireapp/webapp-events';
+import {StatusCodes as HTTP_STATUS} from 'http-status-codes';
 
 import {t} from 'Util/LocalizerUtil';
 
-import {BackendClientError} from '../error/BackendClientError';
-import {BackendEvent} from '../event/Backend';
-import {WebAppEvents} from '../event/WebApp';
-import {EventName} from '../tracking/EventName';
 import {ModalsViewModel} from '../view_model/ModalsViewModel';
 
-import {Conversation} from '../entity/Conversation';
+import type {Conversation} from '../entity/Conversation';
 import {AbstractConversationEventHandler, EventHandlingConfig} from './AbstractConversationEventHandler';
-import {ACCESS_MODE} from './AccessMode';
-import {ACCESS_ROLE} from './AccessRole';
 import {ACCESS_STATE} from './AccessState';
-import {ConversationMapper} from './ConversationMapper';
-import {ConversationService} from './ConversationService';
+import type {ConversationMapper} from './ConversationMapper';
+import type {ConversationService} from './ConversationService';
 
 export class ConversationStateHandler extends AbstractConversationEventHandler {
   private readonly conversationMapper: ConversationMapper;
@@ -42,9 +40,9 @@ export class ConversationStateHandler extends AbstractConversationEventHandler {
   constructor(conversationService: ConversationService, conversationMapper: ConversationMapper) {
     super();
     const eventHandlingConfig: EventHandlingConfig = {
-      [BackendEvent.CONVERSATION.ACCESS_UPDATE]: this._mapConversationAccessState.bind(this),
-      [BackendEvent.CONVERSATION.CODE_DELETE]: this._resetConversationAccessCode.bind(this),
-      [BackendEvent.CONVERSATION.CODE_UPDATE]: this._updateConversationAccessCode.bind(this),
+      [CONVERSATION_EVENT.ACCESS_UPDATE]: this._mapConversationAccessState.bind(this),
+      [CONVERSATION_EVENT.CODE_DELETE]: this._resetConversationAccessCode.bind(this),
+      [CONVERSATION_EVENT.CODE_UPDATE]: this._updateConversationAccessCode.bind(this),
     };
     this.setEventHandlingConfig(eventHandlingConfig);
     this.conversationMapper = conversationMapper;
@@ -63,11 +61,11 @@ export class ConversationStateHandler extends AbstractConversationEventHandler {
         const changeToGuestRoom = accessState === ACCESS_STATE.TEAM.GUEST_ROOM;
         const changeToTeamOnly = accessState === ACCESS_STATE.TEAM.TEAM_ONLY;
         if (changeToGuestRoom) {
-          accessModes = [ACCESS_MODE.INVITE, ACCESS_MODE.CODE];
-          accessRole = ACCESS_ROLE.NON_ACTIVATED;
+          accessModes = [CONVERSATION_ACCESS.INVITE, CONVERSATION_ACCESS.CODE];
+          accessRole = CONVERSATION_ACCESS_ROLE.NON_ACTIVATED;
         } else if (changeToTeamOnly) {
-          accessModes = [ACCESS_MODE.INVITE];
-          accessRole = ACCESS_ROLE.TEAM;
+          accessModes = [CONVERSATION_ACCESS.INVITE];
+          accessRole = CONVERSATION_ACCESS_ROLE.TEAM;
         }
 
         if (accessModes && accessRole) {
@@ -79,9 +77,6 @@ export class ConversationStateHandler extends AbstractConversationEventHandler {
               if (changeToTeamOnly) {
                 conversationEntity.accessCode(undefined);
               }
-
-              const attribute = {is_allow_guests: changeToGuestRoom};
-              amplify.publish(WebAppEvents.ANALYTICS.EVENT, EventName.GUEST_ROOMS.ALLOW_GUESTS, attribute);
             })
             .catch(() => {
               const messageString = changeToGuestRoom
@@ -103,7 +98,7 @@ export class ConversationStateHandler extends AbstractConversationEventHandler {
       .getConversationCode(conversationEntity.id)
       .then(response => this.conversationMapper.mapAccessCode(conversationEntity, response))
       .catch(error => {
-        const isNotFound = error.code === BackendClientError.STATUS_CODE.NOT_FOUND;
+        const isNotFound = error.code === HTTP_STATUS.NOT_FOUND;
         if (!isNotFound) {
           this._showModal(t('modalConversationGuestOptionsGetCodeMessage'));
         }
@@ -117,7 +112,6 @@ export class ConversationStateHandler extends AbstractConversationEventHandler {
         const accessCode = response && response.data;
         if (accessCode) {
           this.conversationMapper.mapAccessCode(conversationEntity, accessCode);
-          amplify.publish(WebAppEvents.ANALYTICS.EVENT, EventName.GUEST_ROOMS.LINK_CREATED);
         }
       })
       .catch(() => this._showModal(t('modalConversationGuestOptionsRequestCodeMessage')));
@@ -128,25 +122,24 @@ export class ConversationStateHandler extends AbstractConversationEventHandler {
       .deleteConversationCode(conversationEntity.id)
       .then(() => {
         conversationEntity.accessCode(undefined);
-        amplify.publish(WebAppEvents.ANALYTICS.EVENT, EventName.GUEST_ROOMS.LINK_REVOKED);
       })
       .catch(() => this._showModal(t('modalConversationGuestOptionsRevokeCodeMessage')));
   }
 
-  _mapConversationAccessState(conversationEntity: Conversation, eventJson: any): void {
+  private _mapConversationAccessState(conversationEntity: Conversation, eventJson: any): void {
     const {access: accessModes, access_role: accessRole} = eventJson.data;
     this.conversationMapper.mapAccessState(conversationEntity, accessModes, accessRole);
   }
 
-  _resetConversationAccessCode(conversationEntity: Conversation): void {
+  private _resetConversationAccessCode(conversationEntity: Conversation): void {
     conversationEntity.accessCode(undefined);
   }
 
-  _updateConversationAccessCode(conversationEntity: Conversation, eventJson: any): void {
+  private _updateConversationAccessCode(conversationEntity: Conversation, eventJson: any): void {
     this.conversationMapper.mapAccessCode(conversationEntity, eventJson.data);
   }
 
-  _showModal(message: string): void {
+  private _showModal(message: string): void {
     const modalOptions = {text: {message}};
     amplify.publish(WebAppEvents.WARNING.MODAL, ModalsViewModel.TYPE.ACKNOWLEDGE, modalOptions);
   }

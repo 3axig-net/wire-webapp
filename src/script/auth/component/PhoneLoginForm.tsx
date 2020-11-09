@@ -17,7 +17,7 @@
  *
  */
 
-import {LoginData} from '@wireapp/api-client/dist/auth';
+import {LoginData} from '@wireapp/api-client/src/auth';
 import {ArrowIcon, Input, InputBlock, InputSubmitCombo, Loading, RoundIconButton, Select} from '@wireapp/react-ui-kit';
 import React, {useRef, useState} from 'react';
 import {useIntl} from 'react-intl';
@@ -50,7 +50,7 @@ const PhoneLoginForm = ({isFetching, onSubmit}: LoginFormProps) => {
     <InputBlock>
       <Select
         tabIndex={1}
-        style={{marginBottom: 0, height: 57}}
+        style={{height: 57, marginBottom: 0}}
         value={country}
         onChange={(event: React.ChangeEvent<HTMLSelectElement>) => {
           const {value} = event.target;
@@ -73,7 +73,7 @@ const PhoneLoginForm = ({isFetching, onSubmit}: LoginFormProps) => {
       <InputSubmitCombo style={{background: 'none', boxShadow: 'inset 16px 16px 0 #fff, inset -100px -16px 0 #fff'}}>
         <Input
           tabIndex={2}
-          style={{width: 80, marginRight: 1}}
+          style={{marginRight: 1, width: 80}}
           ref={countryCodeInput}
           value={`+${countryCode}`}
           onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,7 +95,7 @@ const PhoneLoginForm = ({isFetching, onSubmit}: LoginFormProps) => {
           markInvalid={!validInput}
           value={phoneNumber}
           autoComplete="section-login phone"
-          pattern={`.{1,1024}`}
+          pattern={'.{1,1024}'}
           type="tel"
           required
           placeholder="phone number"

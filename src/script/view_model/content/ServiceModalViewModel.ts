@@ -17,12 +17,12 @@
  *
  */
 
-import {ParticipantAvatar} from 'Components/participantAvatar';
+import {AVATAR_SIZE} from 'Components/ParticipantAvatar';
 import ko from 'knockout';
 
-import {IntegrationRepository} from '../../integration/IntegrationRepository';
-import {ServiceEntity} from '../../integration/ServiceEntity';
-import {ActionsViewModel} from '../ActionsViewModel';
+import type {IntegrationRepository} from '../../integration/IntegrationRepository';
+import type {ServiceEntity} from '../../integration/ServiceEntity';
+import type {ActionsViewModel} from '../ActionsViewModel';
 
 export class ServiceModalViewModel {
   isVisible: ko.Observable<boolean>;
@@ -35,7 +35,7 @@ export class ServiceModalViewModel {
   ) {
     this.isVisible = ko.observable(false);
     this.service = ko.observable(null);
-    this.avatarSize = ParticipantAvatar.SIZE.LARGE;
+    this.avatarSize = AVATAR_SIZE.LARGE;
   }
 
   showService = (service: ServiceEntity) => {

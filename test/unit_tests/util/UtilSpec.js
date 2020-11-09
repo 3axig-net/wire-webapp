@@ -17,38 +17,23 @@
  *
  */
 
-import ko from 'knockout';
-
 import {
-  createRandomUuid,
-  arrayToMd5Base64,
   arrayToBase64,
-  base64ToBlob,
-  formatBytes,
-  getFileExtension,
-  trimFileExtension,
-  koArrayPushAll,
-  koArrayUnshiftAll,
   base64ToArray,
-  stripDataUri,
-  phoneNumberToE164,
+  base64ToBlob,
+  createRandomUuid,
+  formatBytes,
   getContentTypeFromDataUrl,
-  sortGroupsByLastEvent,
-  stripUrlWrapper,
+  getFileExtension,
   printDevicesId,
+  sortGroupsByLastEvent,
+  stripDataUri,
+  stripUrlWrapper,
+  trimFileExtension,
   zeroPadding,
 } from 'Util/util';
 
 import {Conversation} from 'src/script/entity/Conversation';
-
-describe('arrayToMd5Base64', () => {
-  it('converts a typed array to base64', async () => {
-    const actual = await arrayToMd5Base64(new Uint8Array([8, 8]));
-    const expected = 'w+7NCDwPSCf1JgWbA7deTA==';
-
-    expect(actual).toBe(expected);
-  });
-});
 
 describe('base64ToBlob', () => {
   it('encodes Base64 data URI to blob', async () => {
@@ -142,24 +127,6 @@ describe('trimFileExtension', () => {
   });
 });
 
-describe('koArrayPushAll', () => {
-  it('appends multiple items', () => {
-    const actual = ko.observableArray([1, 2]);
-    koArrayPushAll(actual, [3, 4]);
-
-    expect(actual()).toEqual([1, 2, 3, 4]);
-  });
-});
-
-describe('koArrayUnshiftAll', () => {
-  it('prepends multiple items', () => {
-    const actual = ko.observableArray([3, 4]);
-    koArrayUnshiftAll(actual, [1, 2]);
-
-    expect(actual()).toEqual([1, 2, 3, 4]);
-  });
-});
-
 describe('base64ToArray', () => {
   it('can convert a gif', async () => {
     const actual = await base64ToArray(
@@ -198,24 +165,6 @@ describe('stripDataUri', () => {
     expect(base64Gif).toBe(base64);
     expect(base64Png).toBe(base64);
     expect(base64Jpg).toBe(base64);
-  });
-});
-
-describe('phoneNumberToE164', () => {
-  it('can convert a US number', () => {
-    expect(phoneNumberToE164('555-666-7777', 'US')).toBe('+15556667777');
-  });
-
-  it('can convert a GR number', () => {
-    expect(phoneNumberToE164('2310 863871', 'GR')).toBe('+302310863871');
-  });
-
-  it('can convert an unknown number', () => {
-    expect(phoneNumberToE164('2310 863871')).toBe('2310863871');
-  });
-
-  it('can convert an invalid number', () => {
-    expect(phoneNumberToE164('foo bar', 'earth')).toBe('');
   });
 });
 
@@ -282,15 +231,15 @@ describe('sortGroupsByLastEvent', () => {
 });
 
 describe('stripUrlWrapper', () => {
-  it('return the string without url wrapper (single quotes)', () => {
+  it('return the string without URL wrapper (single quotes)', () => {
     expect(stripUrlWrapper('url("/path/to/image/image.png")')).toBe('/path/to/image/image.png');
   });
 
-  it('return the string without url wrapper (quotes)', () => {
+  it('return the string without URL wrapper (quotes)', () => {
     expect(stripUrlWrapper('url("/path/to/image/image.png")')).toBe('/path/to/image/image.png');
   });
 
-  it('return the string without url wrapper (without quotes)', () => {
+  it('return the string without URL wrapper (without quotes)', () => {
     expect(stripUrlWrapper('url(/path/to/image/image.png)')).toBe('/path/to/image/image.png');
   });
 });

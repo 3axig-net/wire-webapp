@@ -18,6 +18,7 @@
  */
 
 interface ErrorTypes {
+  [key: string]: string;
   PATTERN_MISMATCH: string;
   RANGE_OVERFLOW: string;
   RANGE_UNDERFLOW: string;
@@ -25,7 +26,6 @@ interface ErrorTypes {
   TOO_LONG: string;
   TYPE_MISMATCH: string;
   VALUE_MISSING: string;
-  [key: string]: string;
 }
 
 export class ValidationError extends Error {
@@ -85,7 +85,8 @@ export class ValidationError extends Error {
     NAME: {...ValidationError.mapErrorsToField('name'), name: 'name'},
     PASSWORD: {...ValidationError.mapErrorsToField('password'), name: 'password'},
     PASSWORD_LOGIN: {...ValidationError.mapErrorsToField('password-login'), name: 'password-login'},
-    SSO_LOGIN: {...ValidationError.mapErrorsToField('sso-code'), name: 'sso-code'},
+    SSO_CODE: {...ValidationError.mapErrorsToField('sso-code'), name: 'sso-code'},
+    SSO_EMAIL_CODE: {...ValidationError.mapErrorsToField('sso-code-email'), name: 'sso-code-email'},
   };
 
   static getFieldByName = (fieldName: string): ErrorTypes => {

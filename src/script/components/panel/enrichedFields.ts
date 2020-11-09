@@ -17,37 +17,33 @@
  *
  */
 
+import type {RichInfoField} from '@wireapp/api-client/src/user/RichInfo';
 import ko from 'knockout';
 
 import {t} from 'Util/LocalizerUtil';
 import {noop} from 'Util/util';
 
-import {graph, resolve} from '../../config/appResolver';
-import {User} from '../../entity/User';
-import {RichField, RichProfileRepository} from '../../user/RichProfileRepository';
+import type {User} from '../../entity/User';
+import {RichProfileRepository} from '../../user/RichProfileRepository';
 
 interface ComponentParams {
-  user: ko.Observable<User>;
-  onFieldsLoaded: (richFields: RichField[]) => void;
+  onFieldsLoaded: (richFields: RichInfoField[]) => void;
   richProfileRepository: RichProfileRepository;
+  user: ko.Observable<User>;
 }
 
 class EnrichedFields {
-  readonly fields: ko.Observable<RichField[]>;
+  readonly fields: ko.Observable<RichInfoField[]>;
   readonly richProfileRepository: RichProfileRepository;
 
-  constructor(params: ComponentParams, element: Node) {
-    const {
-      user,
-      onFieldsLoaded = noop,
-      richProfileRepository = new RichProfileRepository(resolve(graph.BackendClient)),
-    } = params;
+  constructor(params: ComponentParams, element: HTMLElement) {
+    const {user, onFieldsLoaded = noop, richProfileRepository = new RichProfileRepository()} = params;
     this.richProfileRepository = richProfileRepository;
     this.fields = ko.observable([]);
     ko.computed(
       () => {
         if (user()) {
-          const fields: RichField[] = user().email() ? [{type: t('userProfileEmail'), value: user().email()}] : [];
+          const fields: RichInfoField[] = user().email() ? [{type: t('userProfileEmail'), value: user().email()}] : [];
           this.richProfileRepository
             .getUserRichProfile(ko.unwrap(user).id)
             .then(richProfile => {
@@ -84,7 +80,8 @@ ko.components.register('enriched-fields', {
     <!-- /ko -->
   `,
   viewModel: {
-    createViewModel: (params: ComponentParams, componentInfo: {element: Node}) =>
-      new EnrichedFields(params, componentInfo.element),
+    createViewModel: (params: ComponentParams, componentInfo: {element: HTMLElement}) => {
+      return new EnrichedFields(params, componentInfo.element);
+    },
   },
 });

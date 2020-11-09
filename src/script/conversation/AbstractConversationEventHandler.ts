@@ -17,7 +17,7 @@
  *
  */
 
-import {Conversation} from '../entity/Conversation';
+import type {Conversation} from '../entity/Conversation';
 
 export type EventHandlingConfig = {[eventId: string]: (conversationEntity: Conversation) => void | Promise<void>};
 
@@ -34,7 +34,7 @@ export class AbstractConversationEventHandler {
   /**
    * Adds an event handling config to the current instance.
    *
-   * @param eventHandlingConfig - Config containing events name and the associated callback
+   * @param eventHandlingConfig Config containing events name and the associated callback
    */
   setEventHandlingConfig(eventHandlingConfig: EventHandlingConfig): void {
     this.eventHandlingConfig = eventHandlingConfig;
@@ -43,8 +43,8 @@ export class AbstractConversationEventHandler {
   /**
    * Handles a conversation event.
    *
-   * @param conversationEntity - the conversation the event relates to
-   * @param eventJson - JSON data for the event
+   * @param conversationEntity the conversation the event relates to
+   * @param eventJson JSON data for the event
    */
   handleConversationEvent(conversationEntity: Conversation, eventJson: any): Promise<void> {
     const handler = this.eventHandlingConfig[eventJson.type] || (() => Promise.resolve());

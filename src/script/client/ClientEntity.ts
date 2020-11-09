@@ -17,12 +17,13 @@
  *
  */
 
-import {ClientClassification} from '@wireapp/api-client/dist/client/';
+import {ClientClassification, ClientType} from '@wireapp/api-client/src/client/';
 import ko from 'knockout';
 
 import {zeroPadding} from 'Util/util';
+
+import {ClientRecord} from '../storage';
 import {ClientMapper} from './ClientMapper';
-import {ClientType} from './ClientType';
 
 export class ClientEntity {
   static CONFIG = {
@@ -43,7 +44,7 @@ export class ClientEntity {
   };
   model?: string;
   time?: string;
-  type?: ClientType;
+  type?: ClientType.PERMANENT | ClientType.TEMPORARY;
 
   constructor(isSelfClient = false) {
     this.isSelfClient = isSelfClient;
@@ -104,7 +105,7 @@ export class ClientEntity {
   /**
    * This method returns an object which can be stored in our local database.
    */
-  toJson(): Record<string, any> {
+  toJson(): ClientRecord {
     const jsonObject = JSON.parse(ko.toJSON(this));
     delete jsonObject.isSelfClient;
 

@@ -17,37 +17,37 @@
  *
  */
 
-import UUID from 'uuidjs';
-
 import {noop} from 'Util/util';
+import {createRandomUuid} from 'Util/util';
 
 import {ReceiptsMiddleware} from 'src/script/event/preprocessor/ReceiptsMiddleware';
 import {ClientEvent} from 'src/script/event/Client';
 
 describe('ReceiptsMiddleware', () => {
-  const selfId = UUID.genV4();
+  const selfId = createRandomUuid();
   let readReceiptMiddleware;
-  const eventService = {loadEvents: noop, replaceEvent: noop};
-  const userRepository = {
-    self: () => ({
-      id: selfId,
-    }),
-  };
 
-  beforeEach(() => {
-    readReceiptMiddleware = new ReceiptsMiddleware(eventService, userRepository);
+  beforeEach(async () => {
+    const eventService = {loadEvents: noop, replaceEvent: noop};
+    readReceiptMiddleware = new ReceiptsMiddleware(eventService, undefined, {
+      self: () => ({
+        id: selfId,
+      }),
+    });
   });
 
   describe('processEvent', () => {
     it('ignores read receipt for which original message is not found', () => {
       const event = createConfirmationEvent(3);
 
-      spyOn(eventService, 'loadEvents').and.returnValue(Promise.resolve([]));
-      spyOn(eventService, 'replaceEvent');
+      spyOn(readReceiptMiddleware.eventService, 'loadEvents').and.returnValue(Promise.resolve([]));
+      spyOn(readReceiptMiddleware.eventService, 'replaceEvent');
 
       return readReceiptMiddleware.processEvent(event).then(() => {
-        expect(eventService.loadEvents).toHaveBeenCalledWith(event.conversation, [event.data.message_id]);
-        expect(eventService.replaceEvent).not.toHaveBeenCalled();
+        expect(readReceiptMiddleware.eventService.loadEvents).toHaveBeenCalledWith(event.conversation, [
+          event.data.message_id,
+        ]);
+        expect(readReceiptMiddleware.eventService.replaceEvent).not.toHaveBeenCalled();
       });
     });
 
@@ -55,36 +55,42 @@ describe('ReceiptsMiddleware', () => {
       const event = createConfirmationEvent(4);
 
       const originalEvent = {from: selfId, read_receipts: [{time: '', userId: event.from}]};
-      spyOn(eventService, 'loadEvents').and.returnValue(Promise.resolve([originalEvent]));
-      spyOn(eventService, 'replaceEvent');
+      spyOn(readReceiptMiddleware.eventService, 'loadEvents').and.returnValue(Promise.resolve([originalEvent]));
+      spyOn(readReceiptMiddleware.eventService, 'replaceEvent');
 
       return readReceiptMiddleware.processEvent(event).then(() => {
-        expect(eventService.loadEvents).toHaveBeenCalledWith(event.conversation, [event.data.message_id]);
-        expect(eventService.replaceEvent).not.toHaveBeenCalled();
+        expect(readReceiptMiddleware.eventService.loadEvents).toHaveBeenCalledWith(event.conversation, [
+          event.data.message_id,
+        ]);
+        expect(readReceiptMiddleware.eventService.replaceEvent).not.toHaveBeenCalled();
       });
     });
 
     it('ignores read receipts for messages that are not mine', () => {
       const event = createConfirmationEvent(4);
-      const originaleEvent = {from: UUID.genV4()};
-      spyOn(eventService, 'loadEvents').and.returnValue(Promise.resolve([originaleEvent]));
-      spyOn(eventService, 'replaceEvent');
+      const originaleEvent = {from: createRandomUuid()};
+      spyOn(readReceiptMiddleware.eventService, 'loadEvents').and.returnValue(Promise.resolve([originaleEvent]));
+      spyOn(readReceiptMiddleware.eventService, 'replaceEvent');
       return readReceiptMiddleware.processEvent(event).then(() => {
-        expect(eventService.loadEvents).toHaveBeenCalledWith(event.conversation, [event.data.message_id]);
-        expect(eventService.replaceEvent).not.toHaveBeenCalled();
+        expect(readReceiptMiddleware.eventService.loadEvents).toHaveBeenCalledWith(event.conversation, [
+          event.data.message_id,
+        ]);
+        expect(readReceiptMiddleware.eventService.replaceEvent).not.toHaveBeenCalled();
       });
     });
 
     it('updates original message when read confirmation is received', () => {
       const originalEvent = {from: selfId};
-      spyOn(eventService, 'loadEvents').and.returnValue(Promise.resolve([originalEvent]));
-      spyOn(eventService, 'replaceEvent').and.returnValue(Promise.resolve(originalEvent));
+      spyOn(readReceiptMiddleware.eventService, 'loadEvents').and.returnValue(Promise.resolve([originalEvent]));
+      spyOn(readReceiptMiddleware.eventService, 'replaceEvent').and.returnValue(Promise.resolve(originalEvent));
 
-      const event = createConfirmationEvent(4);
+      const event = createConfirmationEvent(4, [], selfId);
 
       return readReceiptMiddleware.processEvent(event).then(() => {
-        expect(eventService.loadEvents).toHaveBeenCalledWith(event.conversation, [event.data.message_id]);
-        expect(eventService.replaceEvent).toHaveBeenCalledWith({
+        expect(readReceiptMiddleware.eventService.loadEvents).toHaveBeenCalledWith(event.conversation, [
+          event.data.message_id,
+        ]);
+        expect(readReceiptMiddleware.eventService.replaceEvent).toHaveBeenCalledWith({
           from: selfId,
           read_receipts: [{time: event.time, userId: event.from}],
           status: event.data.status,
@@ -94,14 +100,16 @@ describe('ReceiptsMiddleware', () => {
 
     it('updates original message when delivered confirmation is received', () => {
       const originalEvent = {from: selfId};
-      spyOn(eventService, 'loadEvents').and.returnValue(Promise.resolve([originalEvent]));
-      spyOn(eventService, 'replaceEvent').and.returnValue(Promise.resolve(originalEvent));
+      spyOn(readReceiptMiddleware.eventService, 'loadEvents').and.returnValue(Promise.resolve([originalEvent]));
+      spyOn(readReceiptMiddleware.eventService, 'replaceEvent').and.returnValue(Promise.resolve(originalEvent));
 
-      const event = createConfirmationEvent(3);
+      const event = createConfirmationEvent(3, [], selfId);
 
       return readReceiptMiddleware.processEvent(event).then(() => {
-        expect(eventService.loadEvents).toHaveBeenCalledWith(event.conversation, [event.data.message_id]);
-        expect(eventService.replaceEvent).toHaveBeenCalledWith({
+        expect(readReceiptMiddleware.eventService.loadEvents).toHaveBeenCalledWith(event.conversation, [
+          event.data.message_id,
+        ]);
+        expect(readReceiptMiddleware.eventService.replaceEvent).toHaveBeenCalledWith({
           from: selfId,
           status: event.data.status,
         });
@@ -110,15 +118,15 @@ describe('ReceiptsMiddleware', () => {
   });
 });
 
-function createConfirmationEvent(status, moreMessageIds = []) {
+function createConfirmationEvent(status, moreMessageIds = [], fromId = createRandomUuid()) {
   return {
-    conversation: UUID.genV4(),
+    conversation: createRandomUuid(),
     data: {
-      message_id: UUID.genV4(),
+      message_id: createRandomUuid(),
       more_message_ids: moreMessageIds,
       status,
     },
-    from: UUID.genV4(),
+    from: fromId,
     time: '12-12-12',
     type: ClientEvent.CONVERSATION.CONFIRMATION,
   };

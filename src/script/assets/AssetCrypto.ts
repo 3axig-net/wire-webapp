@@ -24,9 +24,9 @@ export interface EncryptedAsset {
 }
 
 /**
- * @param cipherText - Encrypted plaintext
- * @param keyBytes - AES key used for encryption
- * @param referenceSha256 - SHA-256 checksum of the cipherText
+ * @param cipherText Encrypted plaintext
+ * @param keyBytes AES key used for encryption
+ * @param referenceSha256 SHA-256 checksum of the cipherText
  * @returns Resolves with the decrypted asset
  */
 export const decryptAesAsset = async (
@@ -47,16 +47,13 @@ export const decryptAesAsset = async (
 export const encryptAesAsset = async (plaintext: ArrayBuffer): Promise<EncryptedAsset> => {
   const initializationVector = generateRandomBytes(16);
   const rawKeyBytes = generateRandomBytes(32);
-  let ivCipherText: Uint8Array;
-
   const key = await window.crypto.subtle.importKey('raw', rawKeyBytes.buffer, 'AES-CBC', true, ['encrypt']);
-
   const cipherText = await window.crypto.subtle.encrypt(
     {iv: initializationVector.buffer, name: 'AES-CBC'},
     key,
     plaintext,
   );
-  ivCipherText = new Uint8Array(cipherText.byteLength + initializationVector.byteLength);
+  const ivCipherText = new Uint8Array(cipherText.byteLength + initializationVector.byteLength);
   ivCipherText.set(initializationVector, 0);
   ivCipherText.set(new Uint8Array(cipherText), initializationVector.byteLength);
 
@@ -66,18 +63,12 @@ export const encryptAesAsset = async (plaintext: ArrayBuffer): Promise<Encrypted
   return {cipherText: ivCipherText.buffer, keyBytes: keyBytes, sha256: digest};
 };
 
-/**
- * @private
- */
 const equalHashes = (bufferA: ArrayBuffer, bufferB: ArrayBuffer): boolean => {
   const arrayA = new Uint32Array(bufferA);
   const arrayB = new Uint32Array(bufferB);
   return arrayA.length === arrayB.length && arrayA.every((value, index) => value === arrayB[index]);
 };
 
-/**
- * @private
- */
 const generateRandomBytes = (length: number): Uint8Array => {
   const getRandomValue = () => {
     const buffer = new Uint32Array(1);

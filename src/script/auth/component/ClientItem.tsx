@@ -17,7 +17,7 @@
  *
  */
 
-import {RegisteredClient} from '@wireapp/api-client/dist/client/index';
+import {RegisteredClient} from '@wireapp/api-client/src/client/index';
 import {
   COLOR,
   ContainerXS,
@@ -60,7 +60,7 @@ const ClientItem = ({selected, onClientRemoval, onClick, client, clientError, re
   const [isAnimating, setIsAnimating] = useState(false);
   const [password, setPassword] = useState('');
   const [isValidPassword, setIsValidPassword] = useState(true);
-  const [validationError, setValidationError] = useState();
+  const [validationError, setValidationError] = useState<ValidationError | null>(null);
 
   useEffect(() => {
     if (!selected && isSelected) {
@@ -86,10 +86,9 @@ const ClientItem = ({selected, onClientRemoval, onClick, client, clientError, re
       if (step < CONFIG.animationSteps) {
         window.requestAnimationFrame(executeAnimateIn);
         return step + 1;
-      } else {
-        setIsAnimating(false);
-        return step;
       }
+      setIsAnimating(false);
+      return step;
     });
   };
 
@@ -98,10 +97,9 @@ const ClientItem = ({selected, onClientRemoval, onClick, client, clientError, re
       if (step > 0) {
         window.requestAnimationFrame(executeAnimateOut);
         return step - 1;
-      } else {
-        setIsAnimating(false);
-        return step;
       }
+      setIsAnimating(false);
+      return step;
     });
   };
 
@@ -192,7 +190,10 @@ const ClientItem = ({selected, onClientRemoval, onClick, client, clientError, re
   return (
     <ContainerXS>
       <ContainerXS
-        style={{
+        css={{
+          ['&:focus-within']: {
+            boxShadow: `0 0 0 1px ${COLOR.BLUE}`,
+          },
           backgroundColor: selected ? 'white' : '',
           borderRadius: '4px',
           transition: 'background-color .35s linear',
@@ -237,7 +238,7 @@ const ClientItem = ({selected, onClientRemoval, onClick, client, clientError, re
         {requirePassword && (isSelected || isAnimating) && (
           <ContainerXS style={{maxHeight: `${height}px`, overflow: 'hidden', padding: `${paddingHorizontal}px 0`}}>
             <Form>
-              <InputSubmitCombo style={{background: 'transparent', marginBottom: '0'}}>
+              <InputSubmitCombo style={{background: 'transparent', boxShadow: 'none', marginBottom: '0'}}>
                 <Input
                   autoComplete="section-login password"
                   autoFocus
@@ -248,7 +249,7 @@ const ClientItem = ({selected, onClientRemoval, onClick, client, clientError, re
                     setPassword(event.target.value);
                     setIsValidPassword(true);
                   }}
-                  pattern={`.{1,1024}`}
+                  pattern={'.{1,1024}'}
                   placeholder={_(clientItemStrings.passwordPlaceholder)}
                   required
                   style={{background: 'transparent'}}

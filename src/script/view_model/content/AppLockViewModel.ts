@@ -21,21 +21,25 @@ import {ValidationUtil} from '@wireapp/commons';
 import {amplify} from 'amplify';
 import ko from 'knockout';
 import sodium from 'libsodium-wrappers-sumo';
+import {WebAppEvents} from '@wireapp/webapp-events';
+import {UrlUtil} from '@wireapp/commons';
+import {StatusCodes as HTTP_STATUS} from 'http-status-codes';
+
 import {t} from 'Util/LocalizerUtil';
 import {afterRender} from 'Util/util';
 import {QUERY_KEY} from '../../auth/route';
 import {SIGN_OUT_REASON} from '../../auth/SignOutReason';
-import {getURLParameter} from '../../auth/util/urlUtil';
-import {ClientRepository} from '../../client/ClientRepository';
+import type {ClientRepository} from '../../client/ClientRepository';
 import {Config} from '../../Config';
-import {User} from '../../entity/User';
-import {WebAppEvents} from '../../event/WebApp';
+import type {User} from '../../entity/User';
+import {container} from 'tsyringe';
+import {ClientState} from '../../client/ClientState';
 
 export enum APPLOCK_STATE {
+  FORGOT = 'applock.forgot',
+  LOCKED = 'applock.locked',
   NONE = 'applock.none',
   SETUP = 'applock.setup',
-  LOCKED = 'applock.locked',
-  FORGOT = 'applock.forgot',
   WIPE_CONFIRM = 'applock.wipe-confirm',
   WIPE_PASSWORD = 'applock.wipe-password',
 }
@@ -43,8 +47,8 @@ export enum APPLOCK_STATE {
 const APP_LOCK_STORAGE = 'app_lock';
 
 const getTimeout = (queryName: string, configName: 'APPLOCK_SCHEDULED_TIMEOUT' | 'APPLOCK_UNFOCUS_TIMEOUT') => {
-  const queryTimeout = parseInt(getURLParameter(queryName), 10);
-  const configTimeout = Config.FEATURE && Config.FEATURE[configName];
+  const queryTimeout = parseInt(UrlUtil.getURLParameter(queryName), 10);
+  const configTimeout = Config.getConfig().FEATURE && Config.getConfig().FEATURE[configName];
   const isNotFinite = (value: number) => !Number.isFinite(value);
   if (isNotFinite(queryTimeout) && isNotFinite(configTimeout)) {
     return null;
@@ -58,12 +62,12 @@ const getTimeout = (queryName: string, configName: 'APPLOCK_SCHEDULED_TIMEOUT' |
   return Math.min(queryTimeout, configTimeout);
 };
 
-const getUnfocusAppLockTimeoutinMillis = () => getTimeout(QUERY_KEY.APPLOCK_UNFOCUS_TIMEOUT, 'APPLOCK_UNFOCUS_TIMEOUT');
-const getScheduledAppLockTimeoutinMillis = () =>
+const getUnfocusAppLockTimeoutInMillis = () => getTimeout(QUERY_KEY.APPLOCK_UNFOCUS_TIMEOUT, 'APPLOCK_UNFOCUS_TIMEOUT');
+const getScheduledAppLockTimeoutInMillis = () =>
   getTimeout(QUERY_KEY.APPLOCK_SCHEDULED_TIMEOUT, 'APPLOCK_SCHEDULED_TIMEOUT');
 
-const isUnfocusAppLockEnabled = () => getUnfocusAppLockTimeoutinMillis() !== null;
-const isScheduledAppLockEnabled = () => getScheduledAppLockTimeoutinMillis() !== null;
+const isUnfocusAppLockEnabled = () => getUnfocusAppLockTimeoutInMillis() !== null;
+const isScheduledAppLockEnabled = () => getScheduledAppLockTimeoutInMillis() !== null;
 
 export const isAppLockEnabled = () => isUnfocusAppLockEnabled() || isScheduledAppLockEnabled();
 
@@ -89,7 +93,11 @@ export class AppLockViewModel {
   unlockError: ko.Observable<string>;
   wipeError: ko.Observable<string>;
 
-  constructor(private readonly clientRepository: ClientRepository, selfUser: ko.Observable<User>) {
+  constructor(
+    private readonly clientRepository: ClientRepository,
+    selfUser: ko.Observable<User>,
+    private readonly clientState = container.resolve(ClientState),
+  ) {
     this.localStorage = window.localStorage;
     this.state = ko.observable(APPLOCK_STATE.NONE);
     this.state.subscribe(() => this.stopObserver(), null, 'beforeChange');
@@ -99,20 +107,17 @@ export class AppLockViewModel {
     ko.applyBindings(this, document.getElementById('applock'));
 
     this.isVisible.subscribe(isVisible => {
-      (<HTMLDivElement>document.querySelector('#app')).style.setProperty(
-        'filter',
-        isVisible ? 'blur(100px)' : '',
-        'important',
-      );
+      const app: HTMLDivElement = window.document.querySelector('#app');
+      app.style.setProperty('filter', isVisible ? 'blur(100px)' : '', 'important');
     });
 
-    this.unfocusTimeout = Config.FEATURE.APPLOCK_UNFOCUS_TIMEOUT * 1000;
+    this.unfocusTimeout = Config.getConfig().FEATURE.APPLOCK_UNFOCUS_TIMEOUT * 1000;
     this.unfocusTimeoutId = 0;
 
-    this.scheduledTimeout = Config.FEATURE.APPLOCK_SCHEDULED_TIMEOUT * 1000;
+    this.scheduledTimeout = Config.getConfig().FEATURE.APPLOCK_SCHEDULED_TIMEOUT * 1000;
     this.scheduledTimeoutId = 0;
 
-    this.minPasswordLength = Config.NEW_PASSWORD_MINIMUM_LENGTH;
+    this.minPasswordLength = Config.getConfig().NEW_PASSWORD_MINIMUM_LENGTH;
 
     this.headerText = ko.pureComputed(() => {
       switch (this.state()) {
@@ -125,7 +130,7 @@ export class AppLockViewModel {
         case APPLOCK_STATE.WIPE_CONFIRM:
           return t('modalAppLockWipeConfirmTitle');
         case APPLOCK_STATE.WIPE_PASSWORD:
-          return t('modalAppLockWipePasswordTitle', Config.BRAND_NAME);
+          return t('modalAppLockWipePasswordTitle', Config.getConfig().BRAND_NAME);
         default:
           return '';
       }
@@ -216,13 +221,13 @@ export class AppLockViewModel {
   };
 
   startAppLockTimeout = () => {
-    this.unfocusTimeoutId = window.setTimeout(this.showAppLock, getUnfocusAppLockTimeoutinMillis() * 1000);
+    this.unfocusTimeoutId = window.setTimeout(this.showAppLock, getUnfocusAppLockTimeoutInMillis() * 1000);
   };
 
   startScheduledTimeout = () => {
     if (isScheduledAppLockEnabled()) {
       window.clearTimeout(this.scheduledTimeoutId);
-      this.scheduledTimeoutId = window.setTimeout(this.showAppLock, getScheduledAppLockTimeoutinMillis() * 1000);
+      this.scheduledTimeoutId = window.setTimeout(this.showAppLock, getScheduledAppLockTimeoutInMillis() * 1000);
     }
   };
 
@@ -233,7 +238,7 @@ export class AppLockViewModel {
   };
 
   onUnlock = async (form: HTMLFormElement) => {
-    const enteredCode = (<HTMLInputElement>form[0]).value;
+    const enteredCode = (form[0] as HTMLInputElement).value;
     const hashedCode = this.getStored();
     await sodium.ready;
     if (sodium.crypto_pwhash_str_verify(hashedCode, enteredCode)) {
@@ -266,16 +271,16 @@ export class AppLockViewModel {
 
   onWipeDatabase = async (form: HTMLFormElement) => {
     this.stopObserver();
-    const password = (<HTMLInputElement>form[0]).value;
+    const password = (form[0] as HTMLInputElement).value;
     try {
       this.isLoading(true);
-      const currentClientId = this.clientRepository.currentClient().id;
+      const currentClientId = this.clientState.currentClient().id;
       await this.clientRepository.clientService.deleteClient(currentClientId, password);
       this.localStorage.removeItem(this.storageKey());
       amplify.publish(WebAppEvents.LIFECYCLE.SIGN_OUT, SIGN_OUT_REASON.USER_REQUESTED, true);
     } catch ({code, message}) {
       this.isLoading(false);
-      if ([400, 401, 403].includes(code)) {
+      if ([HTTP_STATUS.BAD_REQUEST, HTTP_STATUS.UNAUTHORIZED, HTTP_STATUS.FORBIDDEN].includes(code)) {
         return this.wipeError(t('modalAppLockWipePasswordError'));
       }
       this.wipeError(message);

@@ -18,9 +18,11 @@
  */
 
 import ko from 'knockout';
+
 import {Call} from 'src/script/calling/Call';
 import {Participant} from 'src/script/calling/Participant';
 import {Conversation} from 'src/script/entity/Conversation';
+import {User} from 'src/script/entity/User';
 import {instantiateComponent} from '../../../../test/helper/knockoutHelpers';
 import './fullscreenVideoCall';
 
@@ -31,8 +33,10 @@ describe('fullscreenVideoCall', () => {
     jasmine.clock().install();
     const conversation = new Conversation();
     spyOn(conversation, 'supportsVideoCall').and.returnValue(true);
-    call = new Call('', '', 0, new Participant('', ''), 0);
-    const params: any = {
+    const selfUser = new User();
+    selfUser.isMe = true;
+    call = new Call('', '', 0, new Participant(selfUser, ''), 0);
+    const params = {
       call,
       callActions: {},
       canShareScreen: false,
@@ -44,9 +48,9 @@ describe('fullscreenVideoCall', () => {
           audioInput: () => '',
           videoInput: () => '',
         },
-      } as any,
+      },
       multitasking: {autoMinimize: () => false},
-      videoGrid: ko.observable({} as any),
+      videoGrid: ko.observable({grid: [], hasRemoteVideo: false, thumbnail: null}),
     };
 
     return instantiateComponent('fullscreen-video-call', params).then((container: Element) => {
@@ -62,9 +66,11 @@ describe('fullscreenVideoCall', () => {
 
   it('shows the calling timer', () => {
     call.startedAt(Date.now());
+
     expect((domContainer.querySelector('.video-timer') as HTMLElement).innerText).toBe('00:00');
     jasmine.clock().mockDate();
     jasmine.clock().tick(1001);
+
     expect((domContainer.querySelector('.video-timer') as HTMLElement).innerText).toBe('00:01');
   });
 });

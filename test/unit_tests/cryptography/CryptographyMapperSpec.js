@@ -35,15 +35,16 @@ import {
   Text,
 } from '@wireapp/protocol-messaging';
 import {isObject} from 'underscore';
+import {CONVERSATION_EVENT} from '@wireapp/api-client/src/event';
+import {ReactionType} from '@wireapp/core/src/main/conversation';
 
 import {GENERIC_MESSAGE_TYPE} from 'src/script/cryptography/GenericMessageType';
 import {CryptographyMapper} from 'src/script/cryptography/CryptographyMapper';
 import {arrayToBase64, createRandomUuid} from 'Util/util';
 import {encryptAesAsset} from 'src/script/assets/AssetCrypto';
 import {ClientEvent} from 'src/script/event/Client';
-import {BackendEvent} from 'src/script/event/Backend';
-import {ReactionType} from 'src/script/message/ReactionType';
-import {PROTO_MESSAGE_TYPE} from '../../../src/script/cryptography/ProtoMessageType';
+import {PROTO_MESSAGE_TYPE} from 'src/script/cryptography/ProtoMessageType';
+import {CryptographyError} from 'src/script/error/CryptographyError';
 
 describe('CryptographyMapper', () => {
   const mapper = new CryptographyMapper();
@@ -275,7 +276,7 @@ describe('CryptographyMapper', () => {
 
       return mapper.mapGenericMessage(generic_message, event).then(event_json => {
         expect(isObject(event_json)).toBeTruthy();
-        expect(event_json.type).toBe(BackendEvent.CONVERSATION.MEMBER_UPDATE);
+        expect(event_json.type).toBe(CONVERSATION_EVENT.MEMBER_UPDATE);
         expect(event_json.conversation).toBe(event.conversation);
         expect(event_json.from).toBe(event.from);
         expect(event_json.time).toBe(event.time);
@@ -469,8 +470,8 @@ describe('CryptographyMapper', () => {
         .mapGenericMessage(generic_message, event)
         .then(done.fail)
         .catch(error => {
-          expect(error instanceof z.error.CryptographyError).toBeTruthy();
-          expect(error.type).toBe(z.error.CryptographyError.TYPE.IGNORED_PREVIEW);
+          expect(error instanceof CryptographyError).toBeTruthy();
+          expect(error.type).toBe(CryptographyError.TYPE.IGNORED_PREVIEW);
           done();
         });
     });
@@ -531,7 +532,7 @@ describe('CryptographyMapper', () => {
 
       return mapper.mapGenericMessage(generic_message, event).then(event_json => {
         expect(isObject(event_json)).toBeTruthy();
-        expect(event_json.type).toBe(BackendEvent.CONVERSATION.MEMBER_UPDATE);
+        expect(event_json.type).toBe(CONVERSATION_EVENT.MEMBER_UPDATE);
         expect(event_json.conversation).toBe(event.conversation);
         expect(event_json.from).toBe(event.from);
         expect(event_json.time).toBe(event.time);
@@ -587,8 +588,8 @@ describe('CryptographyMapper', () => {
         .mapGenericMessage(undefined, {id: 'ABC'})
         .then(done.fail)
         .catch(error => {
-          expect(error instanceof z.error.CryptographyError).toBeTruthy();
-          expect(error.type).toBe(z.error.CryptographyError.TYPE.NO_GENERIC_MESSAGE);
+          expect(error instanceof CryptographyError).toBeTruthy();
+          expect(error.type).toBe(CryptographyError.TYPE.NO_GENERIC_MESSAGE);
           done();
         });
     });

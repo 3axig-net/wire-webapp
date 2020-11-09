@@ -20,16 +20,16 @@
 import {amplify} from 'amplify';
 import ko from 'knockout';
 import {groupBy} from 'underscore';
+import {USER_EVENT} from '@wireapp/api-client/src/event';
+import {WebAppEvents} from '@wireapp/webapp-events';
 
 import {loadValue, resetStoreValue, storeValue} from 'Util/StorageUtil';
 
-import {ClientEntity} from '../client/ClientEntity';
-import {User} from '../entity/User';
-import {BackendEvent} from '../event/Backend';
-import {WebAppEvents} from '../event/WebApp';
+import type {ClientEntity} from '../client/ClientEntity';
+import type {User} from '../entity/User';
 import {PropertiesRepository} from '../properties/PropertiesRepository';
 
-interface Notification {
+export interface Notification {
   data: ClientEntity | boolean;
   type: string;
 }
@@ -43,9 +43,8 @@ interface GroupedNotifications {
  * Take care of storing and keeping track of all the notifications relative to the user preferences (read receipts config, active devices ...)
  */
 export class PreferenceNotificationRepository {
-  private readonly notifications: ko.ObservableArray<Notification>;
+  public readonly notifications: ko.ObservableArray<Notification>;
 
-  // tslint:disable-next-line:typedef
   static get CONFIG() {
     return {
       NOTIFICATION_TYPES: {
@@ -69,14 +68,14 @@ export class PreferenceNotificationRepository {
         : resetStoreValue(notificationsStorageKey);
     });
 
-    amplify.subscribe(WebAppEvents.USER.CLIENT_ADDED, (userId: string, data: ClientEntity) => {
+    amplify.subscribe(WebAppEvents.USER.CLIENT_ADDED, (userId: string, clientEntity?: ClientEntity) => {
       if (userId === selfUserObservable().id) {
-        this.onClientAdd(userId, data);
+        this.onClientAdd(userId, clientEntity);
       }
     });
-    amplify.subscribe(WebAppEvents.USER.CLIENT_REMOVED, (userId: string, data: string) => {
+    amplify.subscribe(WebAppEvents.USER.CLIENT_REMOVED, (userId: string, clientId?: string) => {
       if (userId === selfUserObservable().id) {
-        this.onClientRemove(userId, data);
+        this.onClientRemove(userId, clientId);
       }
     });
     amplify.subscribe(WebAppEvents.USER.EVENT_FROM_BACKEND, this.onUserEvent.bind(this));
@@ -95,7 +94,7 @@ export class PreferenceNotificationRepository {
       .sort((a, b) => prio(a) - prio(b));
   }
 
-  onClientAdd(userId: string, clientEntity: ClientEntity): void {
+  onClientAdd(_userId: string, clientEntity?: ClientEntity): void {
     if (clientEntity) {
       this.notifications.push({
         data: clientEntity,
@@ -104,7 +103,7 @@ export class PreferenceNotificationRepository {
     }
   }
 
-  onClientRemove(userId: string, clientId: string): void {
+  onClientRemove(_userId: string, clientId: string): void {
     this.notifications.remove(({data: clientEntity}) => {
       const isExpectedId = typeof clientEntity !== 'boolean' && clientEntity.id === clientId;
       return isExpectedId && (clientEntity as ClientEntity).isPermanent();
@@ -112,7 +111,7 @@ export class PreferenceNotificationRepository {
   }
 
   onUserEvent(event: any): void {
-    if (event.type === BackendEvent.USER.PROPERTIES_DELETE || event.type === BackendEvent.USER.PROPERTIES_SET) {
+    if (event.type === USER_EVENT.PROPERTIES_DELETE || event.type === USER_EVENT.PROPERTIES_SET) {
       if (event.key === PropertiesRepository.CONFIG.WIRE_RECEIPT_MODE.key) {
         const defaultValue = !!PropertiesRepository.CONFIG.WIRE_RECEIPT_MODE.defaultValue;
         this.notifications.push({

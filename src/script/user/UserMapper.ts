@@ -17,12 +17,15 @@
  *
  */
 
+import type {User as APIClientUser} from '@wireapp/api-client/src/user';
+import type {Self as APIClientSelf} from '@wireapp/api-client/src/self';
+
 import {joaatHash} from 'Util/Crypto';
 import {Logger, getLogger} from 'Util/Logger';
 
 import {mapProfileAssets, mapProfileAssetsV1, updateUserEntityAssets} from '../assets/AssetMapper';
 import {User} from '../entity/User';
-import {ServerTimeHandler} from '../time/serverTimeHandler';
+import type {ServerTimeHandler} from '../time/serverTimeHandler';
 import '../view_model/bindings/CommonBindings';
 
 export class UserMapper {
@@ -31,23 +34,23 @@ export class UserMapper {
 
   /**
    * Construct a new User Mapper.
-   * @param serverTimeHandler - Handles time shift between server and client
+   * @param serverTimeHandler Handles time shift between server and client
    */
   constructor(serverTimeHandler: ServerTimeHandler) {
     this.logger = getLogger('UserMapper');
     this.serverTimeHandler = serverTimeHandler;
   }
 
-  mapUserFromJson(userData: Object): User | void {
+  mapUserFromJson(userData: APIClientUser | APIClientSelf): User {
     return this.updateUserFromObject(new User(), userData);
   }
 
-  mapSelfUserFromJson(userData: any): User {
-    const userEntity = this.updateUserFromObject(new User(), userData) as any;
-    userEntity.is_me = true;
+  mapSelfUserFromJson(userData: APIClientSelf | APIClientUser): User {
+    const userEntity = this.updateUserFromObject(new User(), userData);
+    userEntity.isMe = true;
 
-    if (userData.locale) {
-      userEntity.locale = userData.locale;
+    if ((userData as APIClientSelf).locale) {
+      userEntity.locale = (userData as APIClientSelf).locale;
     }
 
     return userEntity;
@@ -58,7 +61,7 @@ export class UserMapper {
    * @note Return an empty array in any case to prevent crashes.
    * @returns Mapped user entities
    */
-  mapUsersFromJson(usersData: Object[]): (void | User)[] {
+  mapUsersFromJson(usersData: (APIClientSelf | APIClientUser)[]): User[] {
     if (usersData?.length) {
       return usersData.filter(userData => userData).map(userData => this.mapUserFromJson(userData));
     }
@@ -69,10 +72,11 @@ export class UserMapper {
   /**
    * Maps JSON user into a blank user entity or updates an existing one.
    * @note Mapping of single properties to an existing user happens when the user changes his name or accent color.
-   * @param userEntity - User entity that the info shall be mapped to
-   * TODO: Pass in "serverTimeHandler", so that it can be removed from the "UserMapper" constructor
+   * @param userEntity User entity that the info shall be mapped to
+   * @param userData Updated user data from backend
+   * @todo Pass in "serverTimeHandler", so that it can be removed from the "UserMapper" constructor
    */
-  updateUserFromObject(userEntity: User, userData: any): User | undefined {
+  updateUserFromObject(userEntity: User, userData: Partial<APIClientUser | APIClientSelf>): User | undefined {
     if (!userData) {
       return undefined;
     }
@@ -92,6 +96,7 @@ export class UserMapper {
     const {
       accent_id: accentId,
       assets,
+      deleted,
       email,
       expires_at: expirationDate,
       managed_by,
@@ -101,8 +106,8 @@ export class UserMapper {
       picture,
       service,
       sso_id: ssoId,
-      team,
-    } = userData;
+      team: teamId,
+    } = userData as APIClientSelf;
 
     if (accentId) {
       userEntity.accent_id(accentId);
@@ -114,7 +119,7 @@ export class UserMapper {
     if (hasAsset) {
       mappedAssets = mapProfileAssets(userEntity.id, userData.assets);
     } else if (hasPicture) {
-      mappedAssets = mapProfileAssetsV1(userEntity.id, userData.picture);
+      mappedAssets = mapProfileAssetsV1(userEntity.id, (userData as any).picture);
     }
     updateUserEntityAssets(userEntity, mappedAssets);
 
@@ -163,9 +168,13 @@ export class UserMapper {
       userEntity.isSingleSignOn = true;
     }
 
-    if (team) {
+    if (teamId) {
       userEntity.inTeam(true);
-      userEntity.teamId = team;
+      userEntity.teamId = teamId;
+    }
+
+    if (deleted) {
+      userEntity.isDeleted = true;
     }
 
     return userEntity;

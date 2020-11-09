@@ -17,40 +17,15 @@
  *
  */
 
-import {BackendClient} from '../service/BackendClient';
-import {Logger, getLogger} from '../util/Logger';
+import type {RichInfo} from '@wireapp/api-client/src/user/';
+import {container} from 'tsyringe';
 
-export interface RichInfo {
-  fields: RichField[];
-  /** Format version (the current version is 0) */
-  version: number;
-}
-
-export interface RichField {
-  type: string;
-  value: string;
-}
+import {APIClient} from '../service/APIClientSingleton';
 
 export class RichProfileRepository {
-  readonly logger: Logger;
-  private readonly backendClient: BackendClient;
-
-  // tslint:disable-next-line:typedef
-  static get URL() {
-    return {
-      RICH_INFO: '/users/:id/rich-info',
-    };
-  }
-
-  constructor(backendClient: BackendClient) {
-    this.backendClient = backendClient;
-    this.logger = getLogger('RichProfileRepository');
-  }
+  constructor(private readonly apiClient = container.resolve(APIClient)) {}
 
   getUserRichProfile(userId: string): Promise<RichInfo> {
-    return this.backendClient.sendRequest({
-      type: 'GET',
-      url: RichProfileRepository.URL.RICH_INFO.replace(':id', userId),
-    });
+    return this.apiClient.user.api.getRichInfo(userId);
   }
 }

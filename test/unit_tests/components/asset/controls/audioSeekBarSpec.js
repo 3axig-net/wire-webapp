@@ -24,7 +24,6 @@ import ko from 'knockout';
 import 'src/script/components/asset/controls/audioSeekBar';
 
 describe('audio-seek-bar', () => {
-  const activeClass = 'active';
   const loudness = new Uint8Array(Array.from({length: 200}, (item, index) => index));
   const audioAsset = {
     meta: {
@@ -39,43 +38,38 @@ describe('audio-seek-bar', () => {
 
   it('renders level indicators for the audio asset', async () => {
     const audioSeekBar = await instantiateComponent('audio-seek-bar', defaultParams);
-    const numberOfLevels = Math.floor(audioSeekBar.offsetWidth / 3);
-
-    expect(audioSeekBar.children[0].childElementCount).toEqual(numberOfLevels);
+    expect(audioSeekBar.children[0].querySelectorAll('path').length).toEqual(2);
   });
 
   it('updates on audio events', async () => {
     const audioElement = document.createElement('audio');
     Object.defineProperty(audioElement, 'duration', {get: () => 1000});
     audioElement.currentTime = 500;
-    const params = Object.assign({}, defaultParams, {src: audioElement});
+    const params = {...defaultParams, src: audioElement};
 
     const audioSeekBar = await instantiateComponent('audio-seek-bar', params);
-    const levels = Array.from(audioSeekBar.children[0].children);
-    const halfOfLevels = Math.ceil((levels.length + 1) / 2);
-    const activeLevelCount = () => levels.filter(level => level.classList.contains(activeClass)).length;
+    const clipPath = () => audioSeekBar.children[0].style.getPropertyValue('--seek-bar-clip');
 
     audioElement.dispatchEvent(new Event('timeupdate'));
 
-    expect(activeLevelCount()).toEqual(halfOfLevels);
+    expect(clipPath()).toEqual('polygon(0 0, 50% 0, 50% 100%, 0 100%)');
 
     audioElement.dispatchEvent(new Event('ended'));
 
-    expect(activeLevelCount()).toEqual(0);
+    expect(clipPath()).toEqual('polygon(0 0, 0% 0, 0% 100%, 0 100%)');
   });
 
   it('updates the currentTime on click', async () => {
     const audioElement = document.createElement('audio');
     Object.defineProperty(audioElement, 'duration', {get: () => 1000});
     audioElement.currentTime = 0;
-    const params = Object.assign({}, defaultParams, {src: audioElement});
+    const params = {...defaultParams, src: audioElement};
 
     const audioSeekBar = await instantiateComponent('audio-seek-bar', params);
     const clickPositionX = Math.floor(audioSeekBar.offsetWidth / 2);
     const expected = (1000 / audioSeekBar.offsetWidth) * clickPositionX;
-    const margin = 8;
     const element = audioSeekBar.querySelector('div');
-    element.dispatchEvent(new MouseEvent('click', {clientX: clickPositionX + margin}));
+    element.dispatchEvent(new MouseEvent('click', {clientX: clickPositionX}));
 
     expect(audioElement.currentTime).toBeCloseTo(expected);
   });

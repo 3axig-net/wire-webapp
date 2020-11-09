@@ -17,16 +17,17 @@
  *
  */
 
-enum CONTACT_IMPORT {
-  MACOS = 'contact_import.macos',
-}
-
 enum EMOJI {
   REPLACE_INLINE = 'settings.emoji.replace_inline',
 }
 
+enum CALL {
+  ENABLE_VBR_ENCODING = 'settings.call.enable_vbr_encoding',
+}
+
 enum INTERFACE {
   THEME = 'settings.interface.theme',
+  VIEW_FOLDERS = 'settings.interface.view_folders',
 }
 
 enum PREVIEWS {
@@ -38,15 +39,14 @@ enum PROPERTIES {
   NOTIFICATIONS = 'settings.notifications',
   PRIVACY = 'settings.privacy.improve_wire',
   SOUND_ALERTS = 'settings.sound.alerts',
+  TELEMETRY_SHARING = 'settings.privacy.telemetry_sharing',
   VERSION = 'version',
 }
 
-const PROPERTIES_TYPE = {
+export const PROPERTIES_TYPE = {
   ...PROPERTIES,
-  CONTACT_IMPORT,
+  CALL,
   EMOJI,
   INTERFACE,
   PREVIEWS,
 };
-
-export {PROPERTIES_TYPE};

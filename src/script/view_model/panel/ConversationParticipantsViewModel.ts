@@ -19,13 +19,15 @@
 
 import ko from 'knockout';
 
-import {sortByPriority} from 'Util/StringUtil';
+import {sortUsersByPriority} from 'Util/StringUtil';
 
-import {ConversationRepository} from '../../conversation/ConversationRepository';
-import {User} from '../../entity/User';
+import type {ConversationRepository} from '../../conversation/ConversationRepository';
+import type {User} from '../../entity/User';
 import {MotionDuration} from '../../motion/MotionDuration';
-import {SearchRepository} from '../../search/SearchRepository';
-import {TeamRepository} from '../../team/TeamRepository';
+import type {SearchRepository} from '../../search/SearchRepository';
+import type {TeamRepository} from '../../team/TeamRepository';
+import {PanelViewModel} from '../PanelViewModel';
+import type {PanelParams} from '../PanelViewModel';
 import {BasePanelViewModel, PanelViewModelProps} from './BasePanelViewModel';
 
 export class ConversationParticipantsViewModel extends BasePanelViewModel {
@@ -52,7 +54,7 @@ export class ConversationParticipantsViewModel extends BasePanelViewModel {
           .filter((userEntity: User) => !userEntity.isService);
         if (!this.activeConversation().removed_from_conversation()) {
           users.push(this.activeConversation().selfUser());
-          return users.sort((userA, userB) => sortByPriority(userA.first_name(), userB.first_name()));
+          return users.sort(sortUsersByPriority);
         }
         return users;
       }
@@ -70,11 +72,11 @@ export class ConversationParticipantsViewModel extends BasePanelViewModel {
   }
 
   clickOnShowUser(userEntity: User): void {
-    this.navigateTo(z.viewModel.PanelViewModel.STATE.GROUP_PARTICIPANT_USER, {entity: userEntity});
+    this.navigateTo(PanelViewModel.STATE.GROUP_PARTICIPANT_USER, {entity: userEntity});
   }
 
-  initView(highlightedUsers: User[] = []): void {
+  initView({highlighted}: PanelParams = {highlighted: []}): void {
     this.searchInput('');
-    this.highlightedUsers(highlightedUsers);
+    this.highlightedUsers(highlighted);
   }
 }

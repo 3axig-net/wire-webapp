@@ -17,24 +17,27 @@
  *
  */
 
-import {LoginData, RegisterData, SendLoginCode} from '@wireapp/api-client/dist/auth';
-import {ClientType} from '@wireapp/api-client/dist/client/index';
-import {Account} from '@wireapp/core';
-import {CRUDEngine} from '@wireapp/store-engine';
+import type {DomainData} from '@wireapp/api-client/src/account/DomainData';
+import type {LoginData, RegisterData, SendLoginCode} from '@wireapp/api-client/src/auth';
+import {ClientType} from '@wireapp/api-client/src/client/index';
+import type {Account} from '@wireapp/core';
+import type {CRUDEngine} from '@wireapp/store-engine';
 import {SQLeetEngine} from '@wireapp/store-engine-sqleet';
-import {LowDiskSpaceError} from '@wireapp/store-engine/dist/commonjs/engine/error/';
-import {isTemporaryClientAndNonPersistent, noop} from 'Util/util';
+import {LowDiskSpaceError} from '@wireapp/store-engine/src/main/engine/error/';
+import {StatusCodes as HTTP_STATUS} from 'http-status-codes';
+
+import {isTemporaryClientAndNonPersistent} from 'Util/util';
 import {currentCurrency, currentLanguage} from '../../localeConfig';
 import {provideTemporaryAndNonPersistentEngine} from '../../StoreEngineProvider';
-import {Api, RootState, ThunkAction, ThunkDispatch} from '../reducer';
-import {RegistrationDataState} from '../reducer/authReducer';
+import type {Api, RootState, ThunkAction, ThunkDispatch} from '../reducer';
+import type {RegistrationDataState} from '../reducer/authReducer';
 import {COOKIE_NAME_APP_OPENED} from '../selector/CookieSelector';
 import {BackendError} from './BackendError';
 import {AuthActionCreator} from './creator/';
 import {LabeledError} from './LabeledError';
 import {LocalStorageAction, LocalStorageKey} from './LocalStorageAction';
 
-type LoginLifecycleFunction = (dispatch: ThunkDispatch, getState: () => RootState, global: Api) => void;
+type LoginLifecycleFunction = (dispatch: ThunkDispatch, getState: () => RootState, global: Api) => Promise<void>;
 
 export class AuthAction {
   doFlushDatabase = (): ThunkAction => {
@@ -47,24 +50,25 @@ export class AuthAction {
   };
 
   doLogin = (loginData: LoginData): ThunkAction => {
-    const onBeforeLogin: LoginLifecycleFunction = (dispatch, getState, {actions: {authAction}}) =>
+    const onBeforeLogin: LoginLifecycleFunction = async (dispatch, getState, {actions: {authAction}}) =>
       dispatch(authAction.doSilentLogout());
     return this.doLoginPlain(loginData, onBeforeLogin);
   };
 
   doLoginAndJoin = (loginData: LoginData, key: string, code: string, uri?: string): ThunkAction => {
-    const onBeforeLogin: LoginLifecycleFunction = (dispatch, getState, {actions: {authAction}}) =>
+    const onBeforeLogin: LoginLifecycleFunction = async (dispatch, getState, {actions: {authAction}}) =>
       dispatch(authAction.doSilentLogout());
-    const onAfterLogin: LoginLifecycleFunction = (dispatch, getState, {actions: {conversationAction}}) =>
-      dispatch(conversationAction.doJoinConversationByCode(key, code, uri));
+    const onAfterLogin: LoginLifecycleFunction = async (dispatch, getState, {actions: {conversationAction}}) => {
+      await dispatch(conversationAction.doJoinConversationByCode(key, code, uri));
+    };
 
     return this.doLoginPlain(loginData, onBeforeLogin, onAfterLogin);
   };
 
   doLoginPlain = (
     loginData: LoginData,
-    onBeforeLogin: LoginLifecycleFunction = noop,
-    onAfterLogin: LoginLifecycleFunction = noop,
+    onBeforeLogin: LoginLifecycleFunction = async () => {},
+    onAfterLogin: LoginLifecycleFunction = async () => {},
   ): ThunkAction => {
     return async (dispatch, getState, global) => {
       const {
@@ -73,15 +77,17 @@ export class AuthAction {
       } = global;
       dispatch(AuthActionCreator.startLogin());
       try {
-        onBeforeLogin(dispatch, getState, global);
+        await onBeforeLogin(dispatch, getState, global);
         if (isTemporaryClientAndNonPersistent(loginData.clientType === ClientType.PERMANENT)) {
           (core as any).storeEngineProvider = provideTemporaryAndNonPersistentEngine;
         }
         await core.login(loginData, false, clientAction.generateClientPayload(loginData.clientType));
         await this.persistAuthData(loginData.clientType, core, dispatch, localStorageAction);
-        await dispatch(cookieAction.setCookie(COOKIE_NAME_APP_OPENED, {appInstanceId: global.config.APP_INSTANCE_ID}));
+        await dispatch(
+          cookieAction.setCookie(COOKIE_NAME_APP_OPENED, {appInstanceId: global.getConfig().APP_INSTANCE_ID}),
+        );
         await dispatch(selfAction.fetchSelf());
-        onAfterLogin(dispatch, getState, global);
+        await onAfterLogin(dispatch, getState, global);
         await dispatch(
           clientAction.doInitializeClient(
             loginData.clientType,
@@ -120,7 +126,7 @@ export class AuthAction {
     return async (
       dispatch,
       getState,
-      {config, core, actions: {cookieAction, clientAction, selfAction, localStorageAction}},
+      {getConfig, core, actions: {cookieAction, clientAction, selfAction, localStorageAction}},
     ) => {
       dispatch(AuthActionCreator.startLogin());
       try {
@@ -130,7 +136,7 @@ export class AuthAction {
         await core.init(clientType);
         await this.persistAuthData(clientType, core, dispatch, localStorageAction);
         await dispatch(selfAction.fetchSelf());
-        await dispatch(cookieAction.setCookie(COOKIE_NAME_APP_OPENED, {appInstanceId: config.APP_INSTANCE_ID}));
+        await dispatch(cookieAction.setCookie(COOKIE_NAME_APP_OPENED, {appInstanceId: getConfig().APP_INSTANCE_ID}));
         await dispatch(clientAction.doInitializeClient(clientType));
         dispatch(AuthActionCreator.successfulLogin());
       } catch (error) {
@@ -148,13 +154,19 @@ export class AuthAction {
     return async (dispatch, getState, {apiClient}) => {
       const mapError = (error: any) => {
         const statusCode = error?.response?.status;
-        if (statusCode === 404) {
-          return new BackendError({code: 404, label: BackendError.SSO_ERRORS.SSO_NOT_FOUND});
+        if (statusCode === HTTP_STATUS.NOT_FOUND) {
+          return new BackendError({code: HTTP_STATUS.NOT_FOUND, label: BackendError.SSO_ERRORS.SSO_NOT_FOUND});
         }
-        if (statusCode >= 500) {
-          return new BackendError({code: 500, label: BackendError.SSO_ERRORS.SSO_SERVER_ERROR});
+        if (statusCode >= HTTP_STATUS.INTERNAL_SERVER_ERROR) {
+          return new BackendError({
+            code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+            label: BackendError.SSO_ERRORS.SSO_SERVER_ERROR,
+          });
         }
-        return new BackendError({code: 500, label: BackendError.SSO_ERRORS.SSO_GENERIC_ERROR});
+        return new BackendError({
+          code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+          label: BackendError.SSO_ERRORS.SSO_GENERIC_ERROR,
+        });
       };
 
       try {
@@ -174,8 +186,6 @@ export class AuthAction {
     localStorageAction: LocalStorageAction,
   ): Promise<void[]> => {
     const persist = clientType === ClientType.PERMANENT;
-    // TODO: Fixed once core v6 is inside
-    // @ts-ignore
     const accessToken = core['apiClient'].accessTokenStore.accessToken;
     const expiresMillis = accessToken.expires_in * 1000;
     const expireTimestamp = Date.now() + expiresMillis;
@@ -207,7 +217,7 @@ export class AuthAction {
     return async (
       dispatch,
       getState,
-      {config, core, actions: {cookieAction, clientAction, selfAction, localStorageAction}},
+      {getConfig, core, actions: {cookieAction, clientAction, selfAction, localStorageAction}},
     ) => {
       const clientType = ClientType.PERMANENT;
       registration.locale = currentLanguage();
@@ -223,7 +233,7 @@ export class AuthAction {
         await dispatch(this.doSilentLogout());
         await core.register(registration, clientType);
         await this.persistAuthData(clientType, core, dispatch, localStorageAction);
-        await dispatch(cookieAction.setCookie(COOKIE_NAME_APP_OPENED, {appInstanceId: config.APP_INSTANCE_ID}));
+        await dispatch(cookieAction.setCookie(COOKIE_NAME_APP_OPENED, {appInstanceId: getConfig().APP_INSTANCE_ID}));
         await dispatch(selfAction.fetchSelf());
         await dispatch(clientAction.doInitializeClient(clientType));
         dispatch(AuthActionCreator.successfulRegisterTeam(registration));
@@ -238,7 +248,7 @@ export class AuthAction {
     return async (
       dispatch,
       getState,
-      {config, core, actions: {authAction, clientAction, cookieAction, selfAction, localStorageAction}},
+      {getConfig, core, actions: {authAction, clientAction, cookieAction, selfAction, localStorageAction}},
     ) => {
       const clientType = ClientType.PERMANENT;
       registration.locale = currentLanguage();
@@ -250,7 +260,7 @@ export class AuthAction {
         await dispatch(authAction.doSilentLogout());
         await core.register(registration, clientType);
         await this.persistAuthData(clientType, core, dispatch, localStorageAction);
-        await dispatch(cookieAction.setCookie(COOKIE_NAME_APP_OPENED, {appInstanceId: config.APP_INSTANCE_ID}));
+        await dispatch(cookieAction.setCookie(COOKIE_NAME_APP_OPENED, {appInstanceId: getConfig().APP_INSTANCE_ID}));
         await dispatch(selfAction.fetchSelf());
         await dispatch(clientAction.doInitializeClient(clientType));
         dispatch(AuthActionCreator.successfulRegisterPersonal(registration));
@@ -265,7 +275,7 @@ export class AuthAction {
     return async (
       dispatch,
       getState,
-      {config, core, actions: {authAction, cookieAction, clientAction, selfAction, localStorageAction}},
+      {getConfig, core, actions: {authAction, cookieAction, clientAction, selfAction, localStorageAction}},
     ) => {
       const clientType = options.shouldInitializeClient ? ClientType.TEMPORARY : ClientType.NONE;
       registrationData.locale = currentLanguage();
@@ -274,11 +284,15 @@ export class AuthAction {
       dispatch(AuthActionCreator.startRegisterWireless());
       try {
         await dispatch(authAction.doSilentLogout());
+        if (isTemporaryClientAndNonPersistent(false)) {
+          (core as any).storeEngineProvider = provideTemporaryAndNonPersistentEngine;
+        }
         await core.register(registrationData, clientType);
         await this.persistAuthData(clientType, core, dispatch, localStorageAction);
-        await dispatch(cookieAction.setCookie(COOKIE_NAME_APP_OPENED, {appInstanceId: config.APP_INSTANCE_ID}));
+        await dispatch(cookieAction.setCookie(COOKIE_NAME_APP_OPENED, {appInstanceId: getConfig().APP_INSTANCE_ID}));
         await dispatch(selfAction.fetchSelf());
         await (clientType !== ClientType.NONE && dispatch(clientAction.doInitializeClient(clientType)));
+        await dispatch(authAction.doFlushDatabase());
         dispatch(AuthActionCreator.successfulRegisterWireless(registrationData));
       } catch (error) {
         dispatch(AuthActionCreator.failedRegisterWireless(error));
@@ -336,12 +350,37 @@ export class AuthAction {
     };
   };
 
+  doGetDomainInfo = (domain: string): ThunkAction<Promise<DomainData>> => {
+    return async (dispatch, getState, {apiClient}) => {
+      return apiClient.account.api.getDomain(domain);
+    };
+  };
+
+  doGetSSOSettings = (): ThunkAction<Promise<void>> => {
+    return async (dispatch, getState, {apiClient}) => {
+      dispatch(AuthActionCreator.startGetSSOSettings());
+      try {
+        const ssoSettings = await apiClient.account.api.getSSOSettings();
+        dispatch(AuthActionCreator.successfulGetSSOSettings(ssoSettings));
+      } catch (error) {
+        dispatch(AuthActionCreator.failedGetSSOSettings(error));
+      }
+    };
+  };
+
   doLogout = (): ThunkAction => {
-    return async (dispatch, getState, {config, core, actions: {cookieAction, localStorageAction}}) => {
+    return async (dispatch, getState, {getConfig, core, actions: {cookieAction, localStorageAction}}) => {
       dispatch(AuthActionCreator.startLogout());
       try {
         await core.logout();
-        await dispatch(cookieAction.safelyRemoveCookie(COOKIE_NAME_APP_OPENED, config.APP_INSTANCE_ID));
+        if (isTemporaryClientAndNonPersistent(false)) {
+          /**
+           * WEBAPP-6804: Our current implementation of "websql" has the drawback that a mounted database can only get unmounted by refreshing the page.
+           * @see https://github.com/wireapp/websql/blob/v0.0.15/packages/worker/src/Database.ts#L142-L145
+           */
+          window.location.reload();
+        }
+        await dispatch(cookieAction.safelyRemoveCookie(COOKIE_NAME_APP_OPENED, getConfig().APP_INSTANCE_ID));
         await dispatch(localStorageAction.deleteLocalStorage(LocalStorageKey.AUTH.ACCESS_TOKEN.VALUE));
         dispatch(AuthActionCreator.successfulLogout());
       } catch (error) {
@@ -351,11 +390,11 @@ export class AuthAction {
   };
 
   doSilentLogout = (): ThunkAction => {
-    return async (dispatch, getState, {config, core, actions: {cookieAction, localStorageAction}}) => {
+    return async (dispatch, getState, {getConfig, core, actions: {cookieAction, localStorageAction}}) => {
       dispatch(AuthActionCreator.startLogout());
       try {
         await core.logout();
-        await dispatch(cookieAction.safelyRemoveCookie(COOKIE_NAME_APP_OPENED, config.APP_INSTANCE_ID));
+        await dispatch(cookieAction.safelyRemoveCookie(COOKIE_NAME_APP_OPENED, getConfig().APP_INSTANCE_ID));
         await dispatch(localStorageAction.deleteLocalStorage(LocalStorageKey.AUTH.ACCESS_TOKEN.VALUE));
         dispatch(AuthActionCreator.successfulSilentLogout());
       } catch (error) {

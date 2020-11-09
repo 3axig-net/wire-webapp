@@ -37,8 +37,8 @@ export type PromiseRejectFn = (reason?: any) => void;
 
 export interface QueueEntry<T> {
   fn: PromiseFn<T>;
-  resolveFn?: PromiseResolveFn;
   rejectFn: PromiseRejectFn;
+  resolveFn?: PromiseResolveFn;
 }
 
 export class PromiseQueue {
@@ -51,7 +51,6 @@ export class PromiseQueue {
   private readonly queue: QueueEntry<any>[];
   private readonly timeout: number;
 
-  // tslint:disable-next-line:typedef
   static get CONFIG() {
     return {
       UNBLOCK_INTERVAL: TIME_IN_MILLIS.MINUTE,
@@ -163,7 +162,7 @@ export class PromiseQueue {
   /**
    * Resume execution of queue.
    */
-  resume(): void {
+  private resume(): void {
     this.clearInterval();
     this.blocked = false;
     this.pause(false);

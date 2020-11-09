@@ -17,9 +17,9 @@
  *
  */
 
-import {CONVERSATION_EVENT, ConversationTypingEvent} from '@wireapp/api-client/dist/event';
+import {CONVERSATION_EVENT, ConversationTypingEvent} from '@wireapp/api-client/src/event';
+import {CONVERSATION_TYPING} from '@wireapp/api-client/src/conversation/data';
 
-import {CONVERSATION_TYPING} from '@wireapp/api-client/dist/conversation/data';
 import {EventSource} from './EventSource';
 import {EventValidation} from './EventValidation';
 import {validateEvent} from './EventValidator';
@@ -37,6 +37,7 @@ describe('EventValidator', () => {
 
       const source = EventSource.WEB_SOCKET;
       const result = validateEvent(event, source, undefined);
+
       expect(result).toBe(EventValidation.IGNORED_TYPE);
     });
   });

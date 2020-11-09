@@ -17,9 +17,11 @@
  *
  */
 
-import {NewTeamInvitation} from '@wireapp/api-client/dist/team';
-import {Role} from '@wireapp/api-client/dist/team/member';
-import {ThunkAction} from '../reducer';
+import type {NewTeamInvitation} from '@wireapp/api-client/src/team';
+import {Role} from '@wireapp/api-client/src/team/member';
+import {StatusCodes as HTTP_STATUS} from 'http-status-codes';
+
+import type {ThunkAction} from '../reducer';
 import * as InviteSelector from '../selector/InviteSelector';
 import * as languageSelector from '../selector/LanguageSelector';
 import * as selfSelector from '../selector/SelfSelector';
@@ -36,7 +38,7 @@ export class InvitationAction {
       const alreadyInvited = inviteList.find(inviteItem => inviteItem.email.toLowerCase() === invitationEmail);
       if (alreadyInvited) {
         const error = new BackendError({
-          code: 409,
+          code: HTTP_STATUS.CONFLICT,
           label: BackendError.LABEL.ALREADY_INVITED,
           message: 'This email has already been invited',
         });

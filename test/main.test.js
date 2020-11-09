@@ -20,8 +20,12 @@
 // Configure default test config
 window.wire = {};
 window.wire.env = {
+  BACKEND_REST: 'http://localhost',
+  BACKEND_WS: 'wss://localhost',
   FEATURE: {
+    CHECK_CONSENT: false,
     DEFAULT_LOGIN_TEMPORARY_CLIENT: false,
+    ENABLE_DOMAIN_DISCOVERY: true,
   },
 };
 

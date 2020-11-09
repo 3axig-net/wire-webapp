@@ -17,12 +17,13 @@
  *
  */
 
-import {ChangePassword, ConsentType, Self} from '@wireapp/api-client/dist/self';
+import type {ChangePassword, ConsentType, Self} from '@wireapp/api-client/src/self';
+import {StatusCodes as HTTP_STATUS} from 'http-status-codes';
 
 import {Environment} from 'Util/Environment';
 import {getLogger} from 'Util/Logger';
 
-import {ThunkAction} from '../reducer';
+import type {ThunkAction} from '../reducer';
 import {SelfActionCreator} from './creator/';
 
 const logger = getLogger('SelfAction');
@@ -61,8 +62,8 @@ export class SelfAction {
   };
 
   doGetConsents = (): ThunkAction => {
-    return async (dispatch, getState, {apiClient, config}) => {
-      if (!config.FEATURE.CHECK_CONSENT) {
+    return async (dispatch, getState, {apiClient, getConfig}) => {
+      if (!getConfig().FEATURE.CHECK_CONSENT) {
         logger.warn('Consent check feature is disabled.');
         return Promise.resolve();
       }
@@ -78,14 +79,14 @@ export class SelfAction {
   };
 
   doSetConsent = (consentType: ConsentType, value: number): ThunkAction => {
-    return async (dispatch, getState, {apiClient, config}) => {
-      if (!config.FEATURE.CHECK_CONSENT) {
+    return async (dispatch, getState, {apiClient, getConfig}) => {
+      if (!getConfig().FEATURE.CHECK_CONSENT) {
         logger.warn('Consent check feature is disabled.');
         return Promise.resolve();
       }
       dispatch(SelfActionCreator.startSetConsent());
       const consent = {
-        source: `${config.APP_NAME} ${Environment.version(false)}`,
+        source: `${getConfig().APP_NAME} ${Environment.version(false)}`,
         type: consentType,
         value,
       };
@@ -133,7 +134,7 @@ export class SelfAction {
         dispatch(SelfActionCreator.successfulSetPasswordState({hasPassword: true}));
         return true;
       } catch (error) {
-        if (error.response?.status === 404) {
+        if (error.response?.status === HTTP_STATUS.NOT_FOUND) {
           dispatch(SelfActionCreator.successfulSetPasswordState({hasPassword: false}));
           return false;
         }

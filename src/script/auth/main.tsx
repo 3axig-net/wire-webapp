@@ -19,11 +19,12 @@
 
 // Polyfill "Object.entries" & "Object.values"
 import 'core-js/es7/object';
+import 'core-js/es7/reflect';
 import * as cookieStore from 'js-cookie';
 import React from 'react';
 import * as ReactDOM from 'react-dom';
 import {AppContainer} from 'react-hot-loader';
-import {Provider} from 'react-redux';
+import {Provider, ConnectedComponent} from 'react-redux';
 
 import {enableLogging} from 'Util/LoggerUtil';
 import {exposeWrapperGlobals} from 'Util/wrapper';
@@ -31,12 +32,11 @@ import {exposeWrapperGlobals} from 'Util/wrapper';
 import {Config} from '../Config';
 import {configureClient} from './configureClient';
 import {configureCore} from './configureCore';
-import {configureEnvironment} from './configureEnvironment';
+import './configureEnvironment';
 import {configureStore} from './configureStore';
 import {actionRoot} from './module/action';
 import Root from './page/Root';
 
-configureEnvironment();
 exposeWrapperGlobals();
 
 const apiClient = configureClient();
@@ -50,13 +50,13 @@ try {
 const store = configureStore({
   actions: actionRoot,
   apiClient,
-  config: Config,
   cookieStore,
   core,
+  getConfig: Config.getConfig,
   localStorage,
 });
 
-const Wrapper = (Component: React.ComponentClass): JSX.Element => (
+const Wrapper = (Component: ConnectedComponent<React.FunctionComponent, any>): JSX.Element => (
   <AppContainer>
     <Provider store={store}>
       <Component />
@@ -64,7 +64,7 @@ const Wrapper = (Component: React.ComponentClass): JSX.Element => (
   </AppContainer>
 );
 
-const render = (Component: React.ComponentClass): void => {
+const render = (Component: ConnectedComponent<React.FunctionComponent, any>): void => {
   ReactDOM.render(Wrapper(Component), document.getElementById('main'));
 };
 
@@ -77,5 +77,5 @@ function runApp(): void {
   }
 }
 
-enableLogging(Config.FEATURE.ENABLE_DEBUG);
+enableLogging(Config.getConfig().FEATURE.ENABLE_DEBUG);
 runApp();

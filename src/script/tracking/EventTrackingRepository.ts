@@ -17,138 +17,175 @@
  *
  */
 
+import {WebAppEvents} from '@wireapp/webapp-events';
 import {amplify} from 'amplify';
-
 import {Environment} from 'Util/Environment';
-import {Logger, getLogger} from 'Util/Logger';
+import {getLogger, Logger} from 'Util/Logger';
 import {includesString} from 'Util/StringUtil';
-import {TIME_IN_MILLIS} from 'Util/TimeUtil';
 import {getParameter} from 'Util/UrlUtil';
-
+import {createRandomUuid} from 'Util/util';
 import {URLParameter} from '../auth/URLParameter';
-import {WebAppEvents} from '../event/WebApp';
-
-import {TeamRepository} from '../team/TeamRepository';
-import {UserRepository} from '../user/UserRepository';
+import {ROLE as TEAM_ROLE} from '../user/UserPermission';
+import {UserData} from './UserData';
+import {Segmentation} from './Segmentation';
+import {loadValue, storeValue, resetStoreValue} from 'Util/StorageUtil';
+import {getPlatform} from './Helpers';
+import {Config} from '../Config';
+import {roundLogarithmic} from 'Util/NumberUtil';
 import {EventName} from './EventName';
-import * as trackingHelpers from './Helpers';
-import {SuperProperty} from './SuperProperty';
+import type {MessageRepository} from '../conversation/MessageRepository';
+import {ClientEvent} from '../event/Client';
+import {container} from 'tsyringe';
+import {UserState} from '../user/UserState';
+
+const Countly = require('countly-sdk-web');
 
 export class EventTrackingRepository {
-  private isUserAnalyticsActivated: boolean;
-  private lastReportTimestamp?: number;
-  private privacyPreference?: boolean;
-  private providerAPI?: boolean;
+  private isProductReportingActivated: boolean;
+  private sendAppOpenEvent: boolean = true;
+  private countlyDeviceId: string;
   private readonly logger: Logger;
-  private readonly teamRepository: TeamRepository;
-  private readonly userRepository: UserRepository;
   isErrorReportingActivated: boolean;
 
-  // tslint:disable-next-line:typedef
   static get CONFIG() {
     return {
-      ERROR_REPORTING: {
-        API_KEY: window.wire.env.RAYGUN_API_KEY,
-        REPORTING_THRESHOLD: TIME_IN_MILLIS.MINUTE,
-      },
       USER_ANALYTICS: {
         API_KEY: window.wire.env.ANALYTICS_API_KEY,
         CLIENT_TYPE: 'desktop',
-        DISABLED_DOMAINS: ['localhost', 'zinfra.io'],
-        DISABLED_EVENTS: [EventName.TELEMETRY.APP_INITIALIZATION],
+        COUNTLY_DEVICE_ID_LOCAL_STORAGE_KEY: 'COUNTLY_DEVICE_ID',
+        COUNTLY_FAILED_TO_MIGRATE_DEVICE_ID: 'COUNTLY_FAILED_TO_MIGRATE_DEVICE_ID',
+        COUNTLY_UNSYNCED_DEVICE_ID_LOCAL_STORAGE_KEY: 'COUNTLY_OLD_DEVICE_ID',
+        DISABLED_DOMAINS: ['localhost'],
       },
     };
   }
 
-  constructor(teamRepository: TeamRepository, userRepository: UserRepository) {
+  constructor(
+    private readonly messageRepository: MessageRepository,
+    private readonly userState = container.resolve(UserState),
+  ) {
     this.logger = getLogger('EventTrackingRepository');
 
-    this.teamRepository = teamRepository;
-    this.userRepository = userRepository;
-
-    this.providerAPI = undefined;
-    this.lastReportTimestamp = undefined;
-    this.privacyPreference = undefined;
-
     this.isErrorReportingActivated = false;
-    this.isUserAnalyticsActivated = false;
+    this.isProductReportingActivated = false;
+    amplify.subscribe(WebAppEvents.USER.EVENT_FROM_BACKEND, this.onUserEvent);
   }
 
-  /**
-   * @param privacyPreference Privacy preference
-   * @returns Resolves after initialization
-   */
-  async init(privacyPreference: boolean): Promise<void> {
-    this.privacyPreference = privacyPreference;
-    this.logger.info(`Initialize analytics and error reporting: ${this.privacyPreference}`);
-
-    if (this.privacyPreference) {
-      this._enableServices(false);
+  onUserEvent = (eventJson: any, source: EventSource) => {
+    const type = eventJson.type;
+    if (type !== ClientEvent.USER.DATA_TRANSFER) {
+      return;
     }
+    this.migrateDeviceId(eventJson.data.trackingIdentifier);
+  };
 
-    amplify.subscribe(WebAppEvents.PROPERTIES.UPDATE.PRIVACY, this.updatePrivacyPreference);
-  }
-
-  private readonly updatePrivacyPreference = async (privacyPreference: boolean): Promise<void> => {
-    const hasPreferenceChanged = privacyPreference !== this.privacyPreference;
-    if (hasPreferenceChanged) {
-      this.privacyPreference = privacyPreference;
-
-      return this.privacyPreference ? this._enableServices(true) : this._disableServices();
+  migrateDeviceId = async (newId: string) => {
+    try {
+      let stopOnFinish = false;
+      if (!this.isProductReportingActivated) {
+        await this.startProductReporting(this.countlyDeviceId);
+        stopOnFinish = true;
+      }
+      Countly.change_id(newId, true);
+      storeValue(EventTrackingRepository.CONFIG.USER_ANALYTICS.COUNTLY_DEVICE_ID_LOCAL_STORAGE_KEY, newId);
+      this.logger.info(`Countly tracking id has been changed from ${this.countlyDeviceId} to ${newId}`);
+      this.countlyDeviceId = newId;
+      if (stopOnFinish) {
+        this.stopProductReporting();
+      }
+    } catch (error) {
+      this.logger.info(`Failed to send new countly tracking id to other devices ${error}`);
+      storeValue(EventTrackingRepository.CONFIG.USER_ANALYTICS.COUNTLY_FAILED_TO_MIGRATE_DEVICE_ID, newId);
     }
   };
 
-  private async _enableServices(isOptIn = false): Promise<void> {
-    this._enableErrorReporting();
-    if (this._isDomainAllowedForAnalytics()) {
-      await this._enableAnalytics();
-      if (isOptIn) {
-        this._trackEvent(EventName.SETTINGS.OPTED_IN_TRACKING);
+  async init(telemetrySharing: boolean | undefined): Promise<void> {
+    const previousCountlyDeviceId = loadValue<string>(
+      EventTrackingRepository.CONFIG.USER_ANALYTICS.COUNTLY_DEVICE_ID_LOCAL_STORAGE_KEY,
+    );
+    const unsyncedCountlyDeviceId = loadValue<string>(
+      EventTrackingRepository.CONFIG.USER_ANALYTICS.COUNTLY_UNSYNCED_DEVICE_ID_LOCAL_STORAGE_KEY,
+    );
+
+    if (unsyncedCountlyDeviceId) {
+      try {
+        this.messageRepository.sendCountlySync(this.countlyDeviceId);
+        resetStoreValue(EventTrackingRepository.CONFIG.USER_ANALYTICS.COUNTLY_UNSYNCED_DEVICE_ID_LOCAL_STORAGE_KEY);
+      } catch (error) {
+        this.logger.info(`Failed to send new countly tracking id to other devices ${error}`);
       }
     }
+
+    if (previousCountlyDeviceId) {
+      this.countlyDeviceId = previousCountlyDeviceId;
+      const notMigratedCountlyTrackingId = loadValue<string>(
+        EventTrackingRepository.CONFIG.USER_ANALYTICS.COUNTLY_FAILED_TO_MIGRATE_DEVICE_ID,
+      );
+      if (notMigratedCountlyTrackingId) {
+        this.migrateDeviceId(notMigratedCountlyTrackingId);
+      }
+    } else {
+      this.countlyDeviceId = createRandomUuid();
+      storeValue(
+        EventTrackingRepository.CONFIG.USER_ANALYTICS.COUNTLY_DEVICE_ID_LOCAL_STORAGE_KEY,
+        this.countlyDeviceId,
+      );
+      try {
+        this.messageRepository.sendCountlySync(this.countlyDeviceId);
+      } catch (error) {
+        this.logger.info(`Failed to send new countly tracking id to other devices ${error}`);
+        storeValue(EventTrackingRepository.CONFIG.USER_ANALYTICS.COUNTLY_UNSYNCED_DEVICE_ID_LOCAL_STORAGE_KEY, true);
+      }
+    }
+
+    const isTeam = this.userState.isTeam();
+    if (!isTeam) {
+      return; // Countly should not be enabled for non-team users
+    }
+    let enableTelemetrySharing = true;
+    if (typeof telemetrySharing === 'boolean') {
+      enableTelemetrySharing = telemetrySharing;
+    }
+    this.logger.info(`Initialize analytics and error reporting: ${enableTelemetrySharing}`);
+
+    amplify.subscribe(WebAppEvents.PROPERTIES.UPDATE.TELEMETRY_SHARING, this.toggleCountly);
+    this.toggleCountly(telemetrySharing);
   }
 
-  private _disableServices(): void {
-    this._disableErrorReporting();
-    this._trackEvent(EventName.SETTINGS.OPTED_OUT_TRACKING);
-    this._disableAnalytics();
-  }
+  private readonly toggleCountly = (isEnabled: boolean) => {
+    if (isEnabled && this.isDomainAllowedForAnalytics()) {
+      this.startProductReporting();
+    } else {
+      this.stopProductReporting();
+    }
+  };
 
-  //##############################################################################
-  // Analytics
-  //##############################################################################
-
-  private _disableAnalytics(): void {
+  private stopProductReporting(): void {
     this.logger.debug('Analytics was disabled due to user preferences');
-    this.isUserAnalyticsActivated = false;
+    this.isProductReportingActivated = false;
+    this.stopProductReportingSession();
+    this.unsubscribeFromProductTrackingEvents();
+  }
 
-    this._unsubscribeFromAnalyticsEvents();
-
-    if (this.providerAPI) {
-      // Disable provider API
-      this.providerAPI = undefined;
+  private async startProductReporting(trackingId?: string): Promise<void> {
+    if (!window.wire.env.COUNTLY_API_KEY || this.isProductReportingActivated) {
+      return;
     }
-  }
+    this.isProductReportingActivated = true;
 
-  private _enableAnalytics(): Promise<void> {
-    this.isUserAnalyticsActivated = true;
-
-    // Check if provider API is available and reuse if possible
-    const providerPromise = this.providerAPI ? Promise.resolve(this.providerAPI) : this._initAnalytics();
-    return providerPromise.then(providerInstance => {
-      if (providerInstance) {
-        this._setSuperProperties();
-        this._subscribeToAnalyticsEvents();
-      }
+    Countly.init({
+      app_key: window.wire.env.COUNTLY_API_KEY,
+      debug: !Environment.frontend.isProduction(),
+      device_id: trackingId || this.countlyDeviceId,
+      url: 'https://countly.wire.com/',
+      use_session_cookie: false,
     });
+
+    this.startProductReportingSession();
+    this.subscribeToProductEvents();
   }
 
-  private _initAnalytics(): Promise<boolean | undefined> {
-    // Initialize provider API
-    return Promise.resolve(this.providerAPI);
-  }
-
-  private _isDomainAllowedForAnalytics(): boolean {
+  private isDomainAllowedForAnalytics(): boolean {
     const trackingParameter = getParameter(URLParameter.TRACKING);
     return typeof trackingParameter === 'boolean'
       ? trackingParameter
@@ -161,125 +198,75 @@ export class EventTrackingRepository {
         });
   }
 
-  private _resetSuperProperties(): void {
-    if (this.providerAPI) {
-      // Reset super properties on provider API and forget distinct ids
+  private stopProductReportingSession(): void {
+    if (this.isProductReportingActivated === true) {
+      Countly.end_session();
     }
   }
 
-  private _subscribeToAnalyticsEvents(): void {
-    amplify.subscribe(WebAppEvents.ANALYTICS.SUPER_PROPERTY, this, (superPropertyName: string, value: any) => {
-      if (this.isUserAnalyticsActivated) {
-        this._setSuperProperty(superPropertyName, value);
-      }
+  private subscribeToProductEvents(): void {
+    amplify.subscribe(WebAppEvents.ANALYTICS.EVENT, this, (eventName: string, segmentations?: any) => {
+      this.trackProductReportingEvent(eventName, segmentations);
     });
 
-    amplify.subscribe(WebAppEvents.ANALYTICS.EVENT, this, (eventName: string, attributes?: any) => {
-      if (this.isUserAnalyticsActivated) {
-        this._trackEvent(eventName, attributes);
+    amplify.subscribe(WebAppEvents.LIFECYCLE.SIGNED_OUT, this.stopProductReportingSession.bind(this));
+  }
+
+  private startProductReportingSession(): void {
+    if (this.isProductReportingActivated === true) {
+      Countly.begin_session();
+      if (this.sendAppOpenEvent) {
+        this.sendAppOpenEvent = false;
+        this.trackProductReportingEvent(EventName.APP_OPEN);
       }
-    });
-
-    amplify.subscribe(WebAppEvents.LIFECYCLE.SIGNED_OUT, this._resetSuperProperties.bind(this));
-  }
-
-  private _setSuperProperties(): void {
-    this._setSuperProperty(SuperProperty.APP, EventTrackingRepository.CONFIG.USER_ANALYTICS.CLIENT_TYPE);
-    this._setSuperProperty(SuperProperty.APP_VERSION, Environment.version(false));
-    this._setSuperProperty(SuperProperty.DESKTOP_APP, trackingHelpers.getPlatform());
-    if (Environment.desktop) {
-      this._setSuperProperty(SuperProperty.WRAPPER_VERSION, Environment.version(true));
-    }
-
-    if (this.userRepository) {
-      this._setSuperProperty(SuperProperty.CONTACTS, this.userRepository.number_of_contacts());
-      this._setSuperProperty(SuperProperty.TEAM.IN_TEAM, this.teamRepository.isTeam());
-      this._setSuperProperty(SuperProperty.TEAM.SIZE, this.teamRepository.teamSize());
     }
   }
 
-  private _setSuperProperty(superPropertyName: string, value: any): void {
-    // Set property on provider API
-    this.logger.info(`Set super property '${superPropertyName}' to value '${value}'`);
+  private getUserType(): 'member' | 'external' | 'wireless' {
+    if (this.userState.self().teamRole() === TEAM_ROLE.PARTNER) {
+      return 'external';
+    }
+
+    if (this.userState.self().isGuest()) {
+      return 'wireless';
+    }
+
+    return 'member';
   }
 
-  private _trackEvent(eventName: string, attributes?: any): void {
-    const isDisabledEvent = EventTrackingRepository.CONFIG.USER_ANALYTICS.DISABLED_EVENTS.includes(eventName);
-    if (isDisabledEvent) {
-      this.logger.info(`Skipped sending disabled event of type '${eventName}'`);
-    } else {
-      const logAttributes = attributes ? `with attributes: ${JSON.stringify(attributes)}` : 'without attributes';
-      this.logger.info(`Tracking event '${eventName}' ${logAttributes}`);
+  private trackProductReportingEvent(eventName: string, customSegmentations?: any): void {
+    if (this.isProductReportingActivated === true) {
+      const userData = {
+        [UserData.IS_TEAM]: this.userState.isTeam(),
+        [UserData.CONTACTS]: roundLogarithmic(this.userState.numberOfContacts(), 6),
+        [UserData.TEAM_SIZE]: roundLogarithmic(this.userState.teamMembers().length, 6),
+        [UserData.TEAM_ID]: this.userState.self().teamId,
+        [UserData.USER_TYPE]: this.getUserType(),
+      };
+      Object.entries(userData).forEach(entry => {
+        const [key, value] = entry;
+        Countly.userData.set(key, value);
+      });
+      Countly.userData.save();
 
-      // Send event if provider API available
+      const segmentation = {
+        [Segmentation.COMMON.APP]: EventTrackingRepository.CONFIG.USER_ANALYTICS.CLIENT_TYPE,
+        [Segmentation.COMMON.APP_VERSION]: Config.getConfig().VERSION,
+        [Segmentation.COMMON.DESKTOP_APP]: getPlatform(),
+        ...customSegmentations,
+      };
+
+      Countly.add_event({
+        key: eventName,
+        segmentation,
+      });
+
+      this.logger.info(`Reporting custom data for product event ${eventName}@${JSON.stringify(userData)}`);
+      this.logger.info(`Reporting product event ${eventName}@${JSON.stringify(segmentation)}`);
     }
   }
 
-  private _unsubscribeFromAnalyticsEvents(): void {
-    amplify.unsubscribeAll(WebAppEvents.ANALYTICS.SUPER_PROPERTY);
+  private unsubscribeFromProductTrackingEvents(): void {
     amplify.unsubscribeAll(WebAppEvents.ANALYTICS.EVENT);
-  }
-
-  //##############################################################################
-  // Error reporting
-  //##############################################################################
-
-  /**
-   * Checks if a Raygun payload should be reported.
-   *
-   * @see https://github.com/MindscapeHQ/raygun4js#onbeforesend
-   * @param raygunPayload Error payload about to be send
-   * @returns Payload if error will be reported, otherwise `false`
-   */
-  private _checkErrorPayload<T extends object>(raygunPayload: T): T | false {
-    if (!this.lastReportTimestamp) {
-      this.lastReportTimestamp = Date.now();
-      return raygunPayload;
-    }
-
-    const timeSinceLastReport = Date.now() - this.lastReportTimestamp;
-    if (timeSinceLastReport > EventTrackingRepository.CONFIG.ERROR_REPORTING.REPORTING_THRESHOLD) {
-      this.lastReportTimestamp = Date.now();
-      return raygunPayload;
-    }
-
-    return false;
-  }
-
-  private _disableErrorReporting(): void {
-    this.logger.debug('Disabling Raygun error reporting');
-    this.isErrorReportingActivated = false;
-    window.Raygun.detach();
-    window.Raygun.init(EventTrackingRepository.CONFIG.ERROR_REPORTING.API_KEY, {disableErrorTracking: true});
-  }
-
-  private _enableErrorReporting(): void {
-    this.logger.debug('Enabling Raygun error reporting');
-    this.isErrorReportingActivated = true;
-
-    const options = {
-      debugMode: !Environment.frontend.isProduction(),
-      disableErrorTracking: false,
-      excludedHostnames: ['localhost', 'wire.ms'],
-      ignore3rdPartyErrors: true,
-      ignoreAjaxAbort: true,
-      ignoreAjaxError: true,
-    };
-
-    window.Raygun.init(EventTrackingRepository.CONFIG.ERROR_REPORTING.API_KEY, options).attach();
-    window.Raygun.disableAutoBreadcrumbs();
-
-    /*
-     * Adding a version to the Raygun reports to identify which version of the WebApp ran into the issue.
-     * @note We cannot use our own version string as it has to be in a certain format
-     * @see https://github.com/MindscapeHQ/raygun4js#version-filtering
-     */
-    if (!Environment.frontend.isLocalhost()) {
-      window.Raygun.setVersion(Environment.version(false));
-    }
-    if (Environment.desktop) {
-      window.Raygun.withCustomData({electron_version: Environment.version(true)});
-    }
-    window.Raygun.onBeforeSend(this._checkErrorPayload.bind(this));
   }
 }

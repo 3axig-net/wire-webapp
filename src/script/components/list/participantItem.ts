@@ -16,9 +16,10 @@
  * along with this program. If not, see http://www.gnu.org/licenses/.
  *
  */
+
 import ko from 'knockout';
 
-import {ParticipantAvatar} from 'Components/participantAvatar';
+import {AVATAR_SIZE} from 'Components/ParticipantAvatar';
 import {UserlistMode} from 'Components/userList';
 import {t} from 'Util/LocalizerUtil';
 import {capitalizeFirstChar} from 'Util/StringUtil';
@@ -28,37 +29,41 @@ import {ServiceEntity} from '../../integration/ServiceEntity';
 import {viewportObserver} from '../../ui/viewportObserver';
 
 import 'Components/availabilityState';
+import {Participant} from '../../calling/Participant';
 
 interface ParticipantItemParams {
-  participant: User | ServiceEntity;
   badge: boolean;
-  mode: UserlistMode;
+  callParticipant?: Participant;
   canSelect: boolean;
-  isSelected: boolean;
-  showCamera: boolean;
   customInfo: string;
-  hideInfo: boolean;
-  selfInTeam: boolean;
   external: boolean;
+  hideInfo: boolean;
+  isSelected: boolean;
+  isSelfVerified: ko.Subscribable<boolean>;
+  mode: UserlistMode;
+  participant: User | ServiceEntity;
+  selfInTeam: boolean;
 }
 
 class ParticipantItem {
   avatarSize: string;
-  participant: User | ServiceEntity;
-  participantName: () => string | ko.Observable<string>;
+  badge: boolean;
+  canSelect: boolean;
+  callParticipant?: Participant;
+  contentInfo: string | ko.Observable<string>;
+  external: boolean;
+  hasUsernameInfo: boolean;
+  isDefaultMode: boolean;
+  isInViewport: ko.Observable<boolean>;
+  isOthersMode: boolean;
+  isSelected: boolean;
+  isSelf: boolean;
+  isSelfVerified: ko.Subscribable<boolean>;
   isService: boolean;
   isUser: boolean;
+  participant: User | ServiceEntity;
   selfInTeam: boolean;
-  badge: boolean;
-  isDefaultMode: boolean;
-  isOthersMode: boolean;
-  external: boolean;
-  canSelect: boolean;
-  isSelected: boolean;
-  showCamera: boolean;
-  hasUsernameInfo: boolean;
-  contentInfo: string | ko.Observable<string>;
-  isInViewport: ko.Observable<boolean>;
+  selfString: string;
 
   constructor(
     {
@@ -67,23 +72,23 @@ class ParticipantItem {
       mode = UserlistMode.DEFAULT,
       canSelect,
       isSelected,
-      showCamera,
+      callParticipant,
       customInfo,
       hideInfo,
       selfInTeam,
       external,
+      isSelfVerified = ko.observable(false),
     }: ParticipantItemParams,
     element: HTMLElement,
   ) {
-    this.avatarSize = ParticipantAvatar.SIZE.SMALL;
+    this.avatarSize = AVATAR_SIZE.SMALL;
     this.participant = ko.unwrap(participant);
-    this.participantName = () =>
-      (this.participant as User).is_me
-        ? `${(this.participant as User).name()} (${capitalizeFirstChar(t('conversationYouNominative'))})`
-        : this.participant.name;
+    this.isSelf = !!(this.participant as User).isMe;
+    this.selfString = `(${capitalizeFirstChar(t('conversationYouNominative'))})`;
     this.isService = this.participant instanceof ServiceEntity || this.participant.isService;
     this.isUser = this.participant instanceof User && !this.participant.isService;
     this.selfInTeam = selfInTeam;
+    this.isSelfVerified = isSelfVerified;
     this.badge = badge;
 
     this.isDefaultMode = mode === UserlistMode.DEFAULT;
@@ -91,7 +96,8 @@ class ParticipantItem {
 
     this.canSelect = canSelect;
     this.isSelected = isSelected;
-    this.showCamera = showCamera;
+    this.callParticipant = ko.unwrap(callParticipant);
+
     this.external = external;
     const hasCustomInfo = !!customInfo;
 
@@ -129,44 +135,63 @@ ko.components.register('participant-item', {
   template: `
     <div class="participant-item" data-bind="attr: {'data-uie-name': isUser ? 'item-user' : 'item-service', 'data-uie-value': participant.name}">
       <!-- ko if: isInViewport() -->
-        <div class="participant-item-image">
+        <div class="participant-item__image">
           <participant-avatar params="participant: participant, size: avatarSize"></participant-avatar>
         </div>
 
-        <div class="participant-item-content">
-          <!-- ko if: isUser && selfInTeam -->
-            <availability-state class="participant-item-content-availability participant-item-content-name"
-              data-uie-name="status-name"
-              params="availability: participant.availability, label: participantName()"></availability-state>
-          <!-- /ko -->
+        <div class="participant-item__content">
+          <div class="participant-item__content__name-wrapper">
+            <!-- ko if: isUser && selfInTeam -->
+              <availability-state class="participant-item__content__availability participant-item__content__name"
+                data-uie-name="status-name"
+                params="availability: participant.availability, label: participant.name"></availability-state>
+            <!-- /ko -->
 
-          <!-- ko if: isService || !selfInTeam -->
-            <div class="participant-item-content-name" data-bind="text: participantName()" data-uie-name="status-name"></div>
-          <!-- /ko -->
-          <div class="participant-item-content-info">
+            <!-- ko if: isService || !selfInTeam -->
+              <div class="participant-item__content__name" data-bind="text: participant.name" data-uie-name="status-name"></div>
+            <!-- /ko -->
+            <!-- ko if: isSelf -->
+              <div class="participant-item__content__self-indicator" data-bind="text: selfString"></div>
+            <!-- /ko -->
+          </div>
+          <div class="participant-item__content__info">
             <!-- ko if: contentInfo -->
-              <span class="participant-item-content-username label-username-notext" data-bind="text: contentInfo, css: {'label-username': hasUsernameInfo}" data-uie-name="status-username"></span>
+              <span class="participant-item__content__username label-username-notext" data-bind="text: contentInfo, css: {'label-username': hasUsernameInfo}" data-uie-name="status-username"></span>
               <!-- ko if: hasUsernameInfo && badge -->
-                <span class="participant-item-content-badge" data-uie-name="status-partner" data-bind="text: badge"></span>
+                <span class="participant-item__content__badge" data-uie-name="status-partner" data-bind="text: badge"></span>
               <!-- /ko -->
             <!-- /ko -->
           </div>
         </div>
+        
+        <!-- ko if: callParticipant -->
+          <!-- ko if: callParticipant.sharesCamera() -->
+            <camera-icon data-uie-name="status-video"></camera-icon>
+          <!-- /ko -->
 
-        <!-- ko if: isUser && participant.is_verified() -->
-          <verified-icon data-uie-name="status-verified"></verified-icon>
+          <!-- ko if: callParticipant.sharesScreen() -->
+            <screenshare-icon data-uie-name="status-screenshare"></screenshare-icon>
+          <!-- /ko -->
+
+          <!-- ko ifnot: callParticipant.isMuted() -->
+            <mic-on-icon data-uie-name="status-audio-on"></mic-on-icon>
+          <!-- /ko -->
+
+          <!-- ko if: callParticipant.isMuted() -->
+            <mic-off-icon data-uie-name="status-audio-off"></mic-off-icon>
+          <!-- /ko -->
         <!-- /ko -->
 
         <!-- ko if: isUser && !isOthersMode && participant.isGuest() -->
-          <guest-icon class="participant-item-guest-indicator" data-uie-name="status-guest"></guest-icon>
+          <guest-icon data-uie-name="status-guest"></guest-icon>
         <!-- /ko -->
 
         <!-- ko if: external -->
           <partner-icon data-uie-name="status-external"></partner-icon>
         <!-- /ko -->
 
-        <!-- ko if: showCamera -->
-          <camera-icon data-uie-name="status-video"></camera-icon>
+        <!-- ko if: isUser && isSelfVerified() && participant.is_verified() -->
+          <verified-icon data-uie-name="status-verified"></verified-icon>
         <!-- /ko -->
 
         <!-- ko if: canSelect -->
@@ -178,7 +203,7 @@ ko.components.register('participant-item', {
     </div>
   `,
   viewModel: {
-    createViewModel: (props: ParticipantItemParams, componentInfo: any) =>
+    createViewModel: (props: ParticipantItemParams, componentInfo: {element: HTMLElement}) =>
       new ParticipantItem(props, componentInfo.element),
   },
 });

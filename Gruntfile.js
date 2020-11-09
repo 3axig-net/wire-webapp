@@ -18,12 +18,13 @@
  */
 
 const path = require('path');
+const {format} = require('date-fns');
 const {SRC_PATH, DIST_PATH} = require('./locations');
 
 module.exports = grunt => {
   require('load-grunt-tasks')(grunt);
 
-  /* eslint-disable sort-keys */
+  /* eslint-disable sort-keys-fix/sort-keys-fix */
   const dir = {
     src_: SRC_PATH,
     src: {
@@ -32,6 +33,7 @@ module.exports = grunt => {
       page: `${SRC_PATH}/page`,
       style: `${SRC_PATH}/style`,
     },
+    server: 'server',
     dist: {
       s3: `${DIST_PATH}/s3`,
       static: `${DIST_PATH}/static`,
@@ -53,7 +55,7 @@ module.exports = grunt => {
   };
 
   grunt.initConfig({
-    dir: dir,
+    dir,
     aws_s3: require('./grunt/config/aws_s3'),
     clean: require('./grunt/config/clean'),
     compress: require('./grunt/config/compress'),
@@ -64,7 +66,7 @@ module.exports = grunt => {
     shell: require('./grunt/config/shell'),
     watch: require('./grunt/config/watch'),
   });
-  /* eslint-enable sort-keys */
+  /* eslint-enable sort-keys-fix/sort-keys-fix */
 
   grunt.registerTask('build', [
     'clean:dist',
@@ -74,16 +76,13 @@ module.exports = grunt => {
     'build_style',
     'copy:dist_serviceworker',
     'copy:dist_resource',
+    'copy:dist_certificate',
     'build_markup',
   ]);
 
   grunt.registerTask('build_style', ['shell:less', 'postcss']);
 
-  grunt.registerTask('build_markup', [
-    'includereplace:prod_index',
-    'includereplace:prod_auth',
-    'includereplace:prod_login',
-  ]);
+  grunt.registerTask('build_markup', ['includereplace:prod_index', 'includereplace:prod_auth']);
 
   grunt.registerTask('build_prod', ['build', 'shell:dist_bundle', 'compress']);
 
@@ -97,13 +96,8 @@ module.exports = grunt => {
       user = user.substr(0, user.indexOf(' ')).toLowerCase();
     }
 
-    const date = new Date();
-    const month = `0${date.getMonth() + 1}`.slice(-2);
-    const day = `0${date.getDate()}`.slice(-2);
-    const hour = `0${date.getHours()}`.slice(-2);
-    const minute = `0${date.getMinutes()}`.slice(-2);
+    let version = format(new Date(), 'yyyy.MM.dd.HH.mm');
 
-    let version = `${date.getFullYear()}-${month}-${day}-${hour}-${minute}`;
     if (user) {
       version = `${version}-${user}`;
     }
@@ -112,6 +106,6 @@ module.exports = grunt => {
     }
 
     grunt.log.ok(`Version set to ${version}`);
-    grunt.file.write(path.join('server', 'dist', 'version'), version);
+    grunt.file.write(path.join('server/dist/version'), version);
   });
 };

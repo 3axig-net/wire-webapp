@@ -18,7 +18,8 @@
  */
 
 import ko from 'knockout';
-import {ConversationLabel} from '../../conversation/ConversationLabelRepository';
+
+import type {ConversationLabel} from '../../conversation/ConversationLabelRepository';
 
 interface GroupedConversationHeaderParams {
   conversationLabel: ConversationLabel;
@@ -35,7 +36,7 @@ ko.components.register('grouped-conversation-header', {
       <!-- /ko -->
     </div>
   `,
-  viewModel: function({conversationLabel, isOpen}: GroupedConversationHeaderParams): void {
+  viewModel: function ({conversationLabel, isOpen}: GroupedConversationHeaderParams): void {
     this.label = conversationLabel;
     this.isOpen = isOpen;
     this.badge = ko.pureComputed(

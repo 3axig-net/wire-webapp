@@ -18,28 +18,28 @@
  */
 
 import {Decoder} from 'bazinga64';
-import JsMD5 from 'js-md5';
-import {ObservableArray} from 'knockout';
+import type {ObservableArray} from 'knockout';
 import sodium from 'libsodium-wrappers-sumo';
-import {formatE164} from 'phoneformat.js';
 import UUID from 'uuidjs';
+import {UrlUtil} from '@wireapp/commons';
+import {StatusCodes as HTTP_STATUS} from 'http-status-codes';
 
 import {QUERY_KEY} from '../auth/route';
-import * as URLUtil from '../auth/util/urlUtil';
 import {Config} from '../Config';
-import {Conversation} from '../entity/Conversation';
+import type {Conversation} from '../entity/Conversation';
 import {StorageKey} from '../storage/StorageKey';
 
-import {Environment} from './Environment';
 import {loadValue} from './StorageUtil';
+import {AuthError} from '../error/AuthError';
+import {Runtime} from '@wireapp/commons';
 
 export const isTemporaryClientAndNonPersistent = (persist: boolean): boolean => {
   if (persist === undefined) {
     throw new Error('Type of client is unspecified.');
   }
 
-  const isNonPersistentByUrl = URLUtil.getURLParameter(QUERY_KEY.PERSIST_TEMPORARY_CLIENTS) === 'false';
-  const isNonPersistentByServerConfig = Config.FEATURE?.PERSIST_TEMPORARY_CLIENTS === false;
+  const isNonPersistentByUrl = UrlUtil.getURLParameter(QUERY_KEY.PERSIST_TEMPORARY_CLIENTS) === 'false';
+  const isNonPersistentByServerConfig = Config.getConfig().FEATURE?.PERSIST_TEMPORARY_CLIENTS === false;
   const isNonPersistent = isNonPersistentByUrl || isNonPersistentByServerConfig;
 
   const isTemporary = persist === false;
@@ -51,14 +51,13 @@ export const checkIndexedDb = (): Promise<void> => {
     return Promise.resolve();
   }
 
-  if (!Environment.browser.supports.indexedDb) {
-    const errorType = Environment.browser.edge
-      ? z.error.AuthError.TYPE.PRIVATE_MODE
-      : z.error.AuthError.TYPE.INDEXED_DB_UNSUPPORTED;
-    return Promise.reject(new z.error.AuthError(errorType));
+  if (!Runtime.isSupportingIndexedDb()) {
+    const errorType = Runtime.isEdge() ? AuthError.TYPE.PRIVATE_MODE : AuthError.TYPE.INDEXED_DB_UNSUPPORTED;
+    const errorMessage = Runtime.isEdge() ? AuthError.MESSAGE.PRIVATE_MODE : AuthError.MESSAGE.INDEXED_DB_UNSUPPORTED;
+    return Promise.reject(new AuthError(errorType, errorMessage));
   }
 
-  if (Environment.browser.firefox) {
+  if (Runtime.isFirefox()) {
     let dbOpenRequest: IDBOpenDBRequest;
 
     try {
@@ -66,12 +65,12 @@ export const checkIndexedDb = (): Promise<void> => {
       dbOpenRequest.onerror = event => {
         if (dbOpenRequest.error) {
           event.preventDefault();
-          return Promise.reject(new z.error.AuthError(z.error.AuthError.TYPE.PRIVATE_MODE));
+          return Promise.reject(new AuthError(AuthError.TYPE.PRIVATE_MODE, AuthError.MESSAGE.PRIVATE_MODE));
         }
         return undefined;
       };
     } catch (error) {
-      return Promise.reject(new z.error.AuthError(z.error.AuthError.TYPE.PRIVATE_MODE));
+      return Promise.reject(new AuthError(AuthError.TYPE.PRIVATE_MODE, AuthError.MESSAGE.PRIVATE_MODE));
     }
 
     return new Promise((resolve, reject) => {
@@ -84,7 +83,7 @@ export const checkIndexedDb = (): Promise<void> => {
 
         if (dbOpenRequest.readyState === 'done' && !dbOpenRequest.result) {
           window.clearInterval(interval_id);
-          return reject(new z.error.AuthError(z.error.AuthError.TYPE.PRIVATE_MODE));
+          return reject(new AuthError(AuthError.TYPE.PRIVATE_MODE, AuthError.MESSAGE.PRIVATE_MODE));
         }
 
         const tooManyAttempts = currentAttempt >= maxRetry;
@@ -118,7 +117,7 @@ export const loadUrlBuffer = (
     xhr.responseType = 'arraybuffer';
 
     xhr.onload = () => {
-      const isStatusOK = xhr.status === 200;
+      const isStatusOK = xhr.status === HTTP_STATUS.OK;
       return isStatusOK
         ? resolve({buffer: xhr.response, mimeType: xhr.getResponseHeader('content-type')})
         : reject(new Error(xhr.status.toString(10)));
@@ -133,12 +132,12 @@ export const loadUrlBuffer = (
   });
 };
 
-export const loadImage = function(blob: Blob): Promise<GlobalEventHandlers> {
+export const loadImage = function (blob: Blob): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const object_url = window.URL.createObjectURL(blob);
     const img = new Image();
-    img.onload = function(): void {
-      resolve(this);
+    img.onload = () => {
+      resolve(img);
       window.URL.revokeObjectURL(object_url);
     };
     img.onerror = reject;
@@ -177,13 +176,13 @@ export const trimFileExtension = (filename: string): string => {
   return '';
 };
 
-export const formatBytes = (bytes: number, decimals: number): string => {
+export const formatBytes = (bytes: number, decimals: number = 1): string => {
   if (bytes === 0) {
     return '0B';
   }
 
   const kilobytes = 1024;
-  decimals = decimals + 1 || 2;
+  decimals += 1;
   const unit = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
   const index = Math.floor(Math.log(bytes) / Math.log(kilobytes));
   return parseFloat((bytes / Math.pow(kilobytes, index)).toFixed(decimals)) + unit[index];
@@ -219,18 +218,8 @@ export const arrayToBase64 = async (array: ArrayBuffer | Uint8Array): Promise<st
 };
 
 /**
- * Returns a base64 encoded MD5 hash of the the given array.
- */
-export const arrayToMd5Base64 = async (array: Uint8Array): Promise<string> => {
-  await sodium.ready;
-  const md5Hash = JsMD5.arrayBuffer(array);
-  return sodium.to_base64(new Uint8Array(md5Hash), sodium.base64_variants.ORIGINAL);
-};
-
-/**
  * Convert base64 dataURI to Blob
  */
-
 export const base64ToBlob = async (base64: string): Promise<Blob> => {
   const mimeType = getContentTypeFromDataUrl(base64);
   const bytes = await base64ToArray(base64);
@@ -240,7 +229,6 @@ export const base64ToBlob = async (base64: string): Promise<Blob> => {
 /**
  * Downloads blob using a hidden link element.ƒ
  */
-
 export const downloadBlob = (blob: Blob, filename: string, mimeType?: string): number => {
   if (blob) {
     const url = window.URL.createObjectURL(blob);
@@ -272,41 +260,20 @@ export const downloadFile = (url: string, fileName: string, mimeType?: string): 
   }, 100);
 };
 
-export const phoneNumberToE164 = (phoneNumber: string, countryCode: string): string => {
-  return formatE164(`${countryCode}`.toUpperCase(), `${phoneNumber}`);
-};
+export const createRandomUuid = (): string => UUID.genV4().toString();
 
-export const createRandomUuid = (): string => UUID.genV4().hexString;
-
-// Note IE10 listens to "transitionend" instead of "animationend"
+// Note: IE10 listens to "transitionend" instead of "animationend"
 export const alias = {
   animationend: 'transitionend animationend oAnimationEnd MSAnimationEnd mozAnimationEnd webkitAnimationEnd',
 };
 
-export const koArrayPushAll = (koArray: ObservableArray, valuesToPush: any[]) => {
-  // append array to knockout observableArray
-  // https://github.com/knockout/knockout/issues/416
-  const underlyingArray = koArray();
-  koArray.valueWillMutate();
-  ko.utils.arrayPushAll(underlyingArray, valuesToPush);
-  koArray.valueHasMutated();
-};
-
-export const koArrayUnshiftAll = (koArray: ObservableArray, valuesToShift: any[]) => {
-  // prepend array to knockout observableArray
-  const underlyingArray = koArray();
-  koArray.valueWillMutate();
-  Array.prototype.unshift.apply(underlyingArray, valuesToShift);
-  koArray.valueHasMutated();
-};
-
 export const koPushDeferred = (target: ObservableArray, src: any[], number = 100, delay = 300) => {
-  // push array deferred to knockout observableArray
+  /** push array deferred to knockout's `observableArray` */
   let interval: number;
 
   return (interval = window.setInterval(() => {
     const chunk = src.splice(0, number);
-    koArrayPushAll(target, chunk);
+    target.push(...chunk);
 
     if (src.length === 0) {
       return window.clearInterval(interval);
@@ -334,7 +301,7 @@ export const sortObjectByKeys = (object: Record<string, any>, reverse: boolean) 
   }
 
   // Returns a copy of an object, which is ordered by the keys of the original object.
-  return keys.reduce((sortedObject: Record<string, any>, key: string) => {
+  return keys.reduce<Record<string, any>>((sortedObject, key: string) => {
     sortedObject[key] = object[key];
     return sortedObject;
   }, {});
@@ -343,7 +310,7 @@ export const sortObjectByKeys = (object: Record<string, any>, reverse: boolean) 
 // Removes url(' and url(" from the beginning of the string and also ") and ') from the end
 export const stripUrlWrapper = (url: string) => url.replace(/^url\(["']?/, '').replace(/["']?\)$/, '');
 
-export const validateProfileImageResolution = (file: any, minWidth: number, minHeight: number): Promise<boolean> => {
+export const validateProfileImageResolution = (file: File, minWidth: number, minHeight: number): Promise<boolean> => {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image.width >= minWidth && image.height >= minHeight);
@@ -428,6 +395,5 @@ export const afterRender = (callback: TimerHandler): number =>
 
 /**
  * No operation
- * @returns {void}
  */
 export const noop = (): void => {};

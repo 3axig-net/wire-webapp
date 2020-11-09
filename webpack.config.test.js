@@ -22,26 +22,32 @@ const path = require('path');
 const prodConfig = require('./webpack.config');
 const commonConfig = require('./webpack.config.common');
 
-module.exports = Object.assign({}, prodConfig, {
+module.exports = {
+  ...prodConfig,
   devtool: 'inline-source-map',
-  entry: Object.assign(prodConfig.entry, {
-    test: path.resolve(__dirname, 'test', 'index.test.js'),
-  }),
-  externals: Object.assign(prodConfig.externals, {
+  entry: {...prodConfig.entry, test: path.resolve(__dirname, 'test/index.test.js')},
+  externals: {
+    ...prodConfig.externals,
     // These will help enable enzyme to work properly
     cheerio: 'window',
     'react/addons': true,
     'react/lib/ExecutionEnvironment': true,
     'react/lib/ReactContext': true,
-  }),
+  },
   mode: 'development',
   module: {
     rules: [
       ...prodConfig.module.rules,
       {
+        exclude: /node_modules/,
+        include: [path.resolve('test/helper')],
+        loader: 'babel-loader',
+        test: /\.[tj]sx?$/,
+      },
+      {
         enforce: 'post',
-        exclude: [/node_modules/, /\.test\.[tj]sx?/],
-        include: [path.resolve('src/script/auth')],
+        exclude: [/node_modules/, /\.test\.[tj]sx?/, path.resolve('src/script/view_model/')],
+        include: [path.resolve('src/script/')],
         test: /\.[tj]sx?$/,
         use: {
           loader: 'istanbul-instrumenter-loader',
@@ -54,8 +60,12 @@ module.exports = Object.assign({}, prodConfig, {
     ...commonConfig.plugins,
     new webpack.DefinePlugin({
       'process.env': {
-        NODE_ENV: JSON.stringify('test'),
+        NODE_ENV: `"test"`,
       },
     }),
   ],
-});
+  resolve: {
+    ...prodConfig.resolve,
+    alias: {...prodConfig.resolve.alias, src: path.resolve(__dirname, 'src')},
+  },
+};

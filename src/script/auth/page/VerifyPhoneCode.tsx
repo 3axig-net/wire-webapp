@@ -17,8 +17,8 @@
  *
  */
 
-import {LoginData} from '@wireapp/api-client/dist/auth';
-import {CodeInput, Column, Columns, ContainerXS, ErrorMessage, H1, Link} from '@wireapp/react-ui-kit';
+import {LoginData} from '@wireapp/api-client/src/auth';
+import {CodeInput, Column, Columns, ContainerXS, H1, Link} from '@wireapp/react-ui-kit';
 import React, {useEffect, useState} from 'react';
 import {useIntl} from 'react-intl';
 import {connect} from 'react-redux';
@@ -44,7 +44,7 @@ const VerifyPhoneCode = ({
   doSendPhoneLoginCode,
 }: Props & ConnectedProps & DispatchProps) => {
   const {formatMessage: _} = useIntl();
-  const [error, setError] = useState();
+  const [error, setError] = useState<ValidationError | null>(null);
   const {history} = useReactRouter();
 
   useEffect(() => {
@@ -77,7 +77,7 @@ const VerifyPhoneCode = ({
 
   const handleLogin = async (code: string) => {
     try {
-      const login: LoginData = {clientType: loginData.clientType, phone: loginData.phone, code};
+      const login: LoginData = {clientType: loginData.clientType, code, phone: loginData.phone};
       await doLogin(login);
       return history.push(ROUTE.HISTORY_INFO);
     } catch (error) {
@@ -114,7 +114,7 @@ const VerifyPhoneCode = ({
         <div>
           <H1 center>{_(phoneLoginStrings.verifyCodeDescription, {number: loginData.phone})}</H1>
           <CodeInput autoFocus style={{marginTop: 10}} onCodeComplete={handleLogin} data-uie-name="enter-code" />
-          <ErrorMessage data-uie-name="error-message">{parseError(error)}</ErrorMessage>
+          {parseError(error)}
         </div>
         <Columns>
           <Column>

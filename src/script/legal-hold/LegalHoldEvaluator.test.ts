@@ -18,11 +18,14 @@
  */
 
 import {GenericMessage, LegalHoldStatus, Text} from '@wireapp/protocol-messaging';
+
 import {createRandomUuid} from 'Util/util';
+
 import {CryptographyMapper} from '../cryptography/CryptographyMapper';
 import {GENERIC_MESSAGE_TYPE} from '../cryptography/GenericMessageType';
 import {ClientEvent} from '../event/Client';
 import {StatusType} from '../message/StatusType';
+import {EventRecord} from '../storage';
 import * as LegalHoldEvaluator from './LegalHoldEvaluator';
 
 describe('LegalHoldEvaluator', () => {
@@ -55,7 +58,8 @@ describe('LegalHoldEvaluator', () => {
         type: ClientEvent.CONVERSATION.MESSAGE_ADD,
       };
 
-      const mappedEvent = await cryptographyMapper.mapGenericMessage(legalHoldFlagOn, event);
+      const mappedEvent = await cryptographyMapper.mapGenericMessage(legalHoldFlagOn, event as EventRecord);
+
       expect(LegalHoldEvaluator.hasMessageLegalHoldFlag(mappedEvent)).toBe(true);
     });
 
@@ -81,7 +85,8 @@ describe('LegalHoldEvaluator', () => {
         type: ClientEvent.CONVERSATION.MESSAGE_ADD,
       };
 
-      const mappedEvent = await cryptographyMapper.mapGenericMessage(legalHoldFlagOff, event);
+      const mappedEvent = await cryptographyMapper.mapGenericMessage(legalHoldFlagOff, event as EventRecord);
+
       expect(LegalHoldEvaluator.hasMessageLegalHoldFlag(mappedEvent)).toBe(true);
     });
 
@@ -106,7 +111,8 @@ describe('LegalHoldEvaluator', () => {
         type: ClientEvent.CONVERSATION.MESSAGE_ADD,
       };
 
-      const mappedEvent = await cryptographyMapper.mapGenericMessage(legalHoldFlagMissing, event);
+      const mappedEvent = await cryptographyMapper.mapGenericMessage(legalHoldFlagMissing, event as EventRecord);
+
       expect(LegalHoldEvaluator.hasMessageLegalHoldFlag(mappedEvent)).toBe(false);
     });
   });
@@ -137,6 +143,7 @@ describe('LegalHoldEvaluator', () => {
       expect(
         LegalHoldEvaluator.renderLegalHoldMessage({...mappedEvent, ...enabledOnMessage}, LegalHoldStatus.ENABLED),
       ).toBe(false);
+
       expect(
         LegalHoldEvaluator.renderLegalHoldMessage({...mappedEvent, ...enabledOnMessage}, LegalHoldStatus.DISABLED),
       ).toBe(true);
@@ -144,6 +151,7 @@ describe('LegalHoldEvaluator', () => {
       expect(
         LegalHoldEvaluator.renderLegalHoldMessage({...mappedEvent, ...disabledOnMessage}, LegalHoldStatus.ENABLED),
       ).toBe(true);
+
       expect(
         LegalHoldEvaluator.renderLegalHoldMessage({...mappedEvent, ...disabledOnMessage}, LegalHoldStatus.DISABLED),
       ).toBe(false);

@@ -18,21 +18,23 @@
  */
 
 import ko from 'knockout';
+import {ConversationState} from '../../conversation/ConversationState';
+import {container} from 'tsyringe';
 
-import {ConversationRepository} from '../../conversation/ConversationRepository';
-import {Conversation} from '../../entity/Conversation';
-import {User} from '../../entity/User';
-import {ServiceEntity} from '../../integration/ServiceEntity';
-import {SearchRepository} from '../../search/SearchRepository';
-import {TeamRepository} from '../../team/TeamRepository';
+import type {Conversation} from '../../entity/Conversation';
+import type {User} from '../../entity/User';
+import type {ServiceEntity} from '../../integration/ServiceEntity';
+import type {MainViewModel, ViewModelRepositories} from '../MainViewModel';
+import type {PanelParams} from '../PanelViewModel';
 
 export interface PanelViewModelProps {
-  isVisible: ko.Observable<boolean>;
-  navigateTo: (target: string, params?: {entity?: User | ServiceEntity}) => void;
+  isVisible: ko.PureComputed<boolean>;
+  mainViewModel: MainViewModel;
+  navigateTo: (target: string, params?: {addMode?: boolean; entity?: User | ServiceEntity}) => void;
   onClose: () => void;
   onGoBack: () => void;
   onGoToRoot: () => void;
-  repositories: {search: SearchRepository; team: TeamRepository; conversation: ConversationRepository};
+  repositories: ViewModelRepositories;
 }
 
 export class BasePanelViewModel {
@@ -40,9 +42,12 @@ export class BasePanelViewModel {
   onGoBack: () => void;
   onGoToRoot: () => void;
   navigateTo: PanelViewModelProps['navigateTo'];
-  isVisible: ko.Observable<boolean>;
+  isVisible: ko.PureComputed<boolean>;
   activeConversation: ko.Observable<Conversation>;
-  constructor({isVisible, navigateTo, onClose, onGoBack, onGoToRoot, repositories}: PanelViewModelProps) {
+
+  constructor({isVisible, navigateTo, onClose, onGoBack, onGoToRoot}: PanelViewModelProps) {
+    const conversationState = container.resolve(ConversationState);
+
     this.onClose = onClose;
     this.onGoBack = onGoBack;
     this.onGoToRoot = onGoToRoot;
@@ -50,17 +55,17 @@ export class BasePanelViewModel {
 
     this.isVisible = isVisible;
 
-    this.activeConversation = repositories.conversation.active_conversation;
+    this.activeConversation = conversationState.activeConversation;
   }
 
-  initView(): void {}
+  initView(params?: PanelParams): void {}
 
   getElementId(): string {
     return 'conversation-details';
   }
 
   getEntityId(): string | false {
-    return this.activeConversation() ? this.activeConversation().id : false;
+    return this.activeConversation()?.id ?? false;
   }
 
   shouldSkipTransition(): boolean {

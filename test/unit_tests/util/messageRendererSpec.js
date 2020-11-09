@@ -16,7 +16,8 @@
  * along with this program. If not, see http://www.gnu.org/licenses/.
  *
  */
-import {renderMessage} from 'Util/messageRenderer';
+
+import {renderMessage, getRenderedTextContent} from 'Util/messageRenderer';
 import {MentionEntity} from 'src/script/message/MentionEntity';
 
 const escapeLink = link => link.replace(/&/g, '&amp;');
@@ -196,6 +197,14 @@ describe('renderMessage', () => {
     );
   });
 
+  it('renders links without changing their appearance', () => {
+    const punyLink = 'https://xn--outfank-jdc.nl/';
+
+    expect(renderMessage(punyLink)).toBe(
+      `<a href="${punyLink}" target="_blank" rel="nofollow noopener noreferrer">${punyLink}</a>`,
+    );
+  });
+
   describe('Mentions', () => {
     const tests = [
       {
@@ -347,7 +356,7 @@ describe('Markdown for code snippets', () => {
 
   it('renders escaped Ruby code blocks', () => {
     const expected =
-      '<pre><code class="lang-ruby"><span class="hljs-built_in">require</span> <span class="hljs-string">\'redcarpet\'</span>\nmarkdown = Redcarpet.<span class="hljs-keyword">new</span>(<span class="hljs-string">"Hello World!"</span>)\nputs markdown.to_html\n</code></pre>';
+      '<pre><code class="lang-ruby"><span class="hljs-built_in">require</span> <span class="hljs-string">&#x27;redcarpet&#x27;</span>\nmarkdown = Redcarpet.<span class="hljs-keyword">new</span>(<span class="hljs-string">&quot;Hello World!&quot;</span>)\nputs markdown.to_html\n</code></pre>';
 
     expect(
       renderMessage(
@@ -358,7 +367,7 @@ describe('Markdown for code snippets', () => {
 
   it('renders escaped JavaScript code blocks', () => {
     const expected =
-      '<pre><code class="lang-js">$(<span class="hljs-built_in">document</span>).ready(<span class="hljs-function"><span class="hljs-keyword">function</span>(<span class="hljs-params"></span>) </span>{\n  $(<span class="hljs-string">\'pre code\'</span>).each(<span class="hljs-function"><span class="hljs-keyword">function</span>(<span class="hljs-params">i, block</span>) </span>{\n    hljs.highlightBlock(block);\n  });\n});\n</code></pre>';
+      '<pre><code class="lang-js">$(<span class="hljs-built_in">document</span>).ready(<span class="hljs-function"><span class="hljs-keyword">function</span>(<span class="hljs-params"></span>) </span>{\n  $(<span class="hljs-string">&#x27;pre code&#x27;</span>).each(<span class="hljs-function"><span class="hljs-keyword">function</span>(<span class="hljs-params">i, block</span>) </span>{\n    hljs.highlightBlock(block);\n  });\n});\n</code></pre>';
 
     expect(
       renderMessage(
@@ -367,20 +376,19 @@ describe('Markdown for code snippets', () => {
     ).toEqual(expected);
   });
 
-  it('renders escaped CoffeeScript code blocks', () => {
+  it('renders escaped TypeScript code blocks', () => {
     const expected =
-      '<pre><code class="lang-coffeescript"><span class="hljs-comment"># <span class="hljs-doctag">TODO:</span> This is not a general utility:</span>\n<span class="hljs-comment"># It should be part of a view model as it\'s UI related.</span>\n  z.util.convert_timestamps = <span class="hljs-function">-&gt;</span>\n    <span class="hljs-keyword">if</span> $(<span class="hljs-string">\'time\'</span>).length &gt; <span class="hljs-number">0</span>\n<span class="hljs-function">      <span class="hljs-title">recalculate</span> = -&gt;</span>\n</code></pre>';
-
+      '<pre><code class="lang-typescript"><span class="hljs-keyword">const</span> greetings = (name: <span class="hljs-built_in">string</span>): <span class="hljs-function"><span class="hljs-params">string</span> =&gt;</span> {\n  <span class="hljs-keyword">return</span> <span class="hljs-string">`Hello, <span class="hljs-subst">${name}</span>!`</span>;\n};\n<span class="hljs-built_in">console</span>.log(greetings(<span class="hljs-string">&#x27;world&#x27;</span>));\n</code></pre>';
     expect(
       renderMessage(
-        "```coffeescript\n# TODO: This is not a general utility:\n# It should be part of a view model as it's UI related.\n  z.util.convert_timestamps = ->\n    if $('time').length > 0\n      recalculate = ->\n```",
+        "```typescript\nconst greetings = (name: string): string => {\n  return `Hello, ${name}!`;\n};\nconsole.log(greetings('world'));\n```",
       ),
     ).toEqual(expected);
   });
 
   it('renders escaped HTML code blocks', () => {
     const expected =
-      '<pre><code class="lang-html">&lt;<span class="hljs-selector-tag">a</span> href=<span class="hljs-string">"javascript:wire.app.logout()"</span>&gt;This is <span class="hljs-selector-tag">a</span> trick&lt;/a&gt;\n</code></pre>';
+      '<pre><code class="lang-html">&lt;<span class="hljs-keyword">a</span> href=<span class="hljs-string">&quot;javascript:wire.app.logout()&quot;</span>&gt;This is <span class="hljs-keyword">a</span> trick&lt;/<span class="hljs-keyword">a</span>&gt;\n</code></pre>';
 
     expect(renderMessage('```html\n<a href="javascript:wire.app.logout()">This is a trick</a>\n```')).toEqual(expected);
   });
@@ -389,6 +397,15 @@ describe('Markdown for code snippets', () => {
     const expected = '<code>&lt;a href=&quot;javascript:wire.app.logout()&quot;&gt;This is a trick&lt;/a&gt;</code>';
 
     expect(renderMessage('`<a href="javascript:wire.app.logout()">This is a trick</a>`')).toEqual(expected);
+  });
+});
+
+describe('Markdown for headings', () => {
+  it('renders all headings the same', () => {
+    expect(renderMessage('# heading')).toBe('<div class="md-heading">heading</div>');
+    expect(renderMessage('## heading')).toBe('<div class="md-heading">heading</div>');
+    expect(renderMessage('### heading')).toBe('<div class="md-heading">heading</div>');
+    expect(renderMessage('#### heading')).toBe('<div class="md-heading">heading</div>');
   });
 });
 
@@ -418,8 +435,7 @@ describe('Ignored Markdown syntax', () => {
     expect(renderMessage('***\nNo horizontal lines\n***')).toBe('***<br>No horizontal lines<br>***');
   });
 
-  it('does not render headers', () => {
-    expect(renderMessage('# no header')).toBe('# no header');
+  it('does not render underline headers', () => {
     expect(renderMessage('no h1\n===')).toBe('no h1<br>===');
     expect(renderMessage('no h2\n---')).toBe('no h2<br>---');
   });
@@ -431,7 +447,7 @@ describe('Ignored Markdown syntax', () => {
 
   it('does not render tables', () => {
     const input = 'First Header | Second Header\n------------ | -------------\nCell 1 | Cell 2';
-    const expected = `First Header | Second Header<br>------------ | -------------<br>Cell 1 | Cell 2`;
+    const expected = 'First Header | Second Header<br>------------ | -------------<br>Cell 1 | Cell 2';
 
     expect(renderMessage(input)).toBe(expected);
   });
@@ -449,5 +465,20 @@ describe('Markdown exceptions', () => {
     const text = 'calling__voice_channel__fulltitle';
 
     expect(renderMessage(text)).toBe(text);
+  });
+});
+
+describe('getRenderedTextContent', () => {
+  it('strips all markdown notation from the message', () => {
+    const input = 'This is *italic* and\n**bold** and\n***bold-italic*** and [email](mailto:test@email.com)';
+    const expected = 'This is italic and\nbold and\nbold-italic and email';
+
+    expect(getRenderedTextContent(input)).toBe(expected);
+  });
+
+  it('keeps special characters as they are', () => {
+    const input = '17 % 5 == 2 && 3 < 4';
+
+    expect(getRenderedTextContent(input)).toBe(input);
   });
 });

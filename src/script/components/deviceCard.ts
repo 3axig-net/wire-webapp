@@ -17,17 +17,18 @@
  *
  */
 
-import {ClientClassification} from '@wireapp/api-client/dist/client';
-import {formatTimestamp} from 'Util/TimeUtil';
-import {ClientEntity} from '../client/ClientEntity';
+import ko from 'knockout';
+import {ClientClassification} from '@wireapp/api-client/src/client';
+
+import type {ClientEntity} from '../client/ClientEntity';
 
 interface DeviceCardParams {
   click?: (device: ClientEntity) => void;
-  device: ClientEntity | ko.Observable<ClientEntity>;
-  detailed?: boolean;
   current?: boolean;
-  showVerified?: boolean;
+  detailed?: boolean;
+  device: ClientEntity | ko.Observable<ClientEntity>;
   showIcon?: boolean;
+  showVerified?: boolean;
 }
 
 ko.components.register('device-card', {
@@ -75,7 +76,7 @@ ko.components.register('device-card', {
       <!-- /ko -->
     </div>
   `,
-  viewModel: function({
+  viewModel: function ({
     click,
     device: wrappedDevice,
     detailed = false,
@@ -95,8 +96,6 @@ ko.components.register('device-card', {
     this.clickable = !detailed && click;
 
     this.dataUieName = `device-card${current ? '-current' : ''}`;
-
-    this.timestamp = formatTimestamp(clientEntity.time);
     this.isVerified = meta.isVerified;
     this.showVerified = showVerified;
     this.showLegalHoldIcon = showIcon && deviceClass === ClientClassification.LEGAL_HOLD;

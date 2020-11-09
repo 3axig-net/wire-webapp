@@ -17,66 +17,35 @@
  *
  */
 
-import {BackendClient} from '../service/BackendClient';
+import {container} from 'tsyringe';
 
-class PropertiesService {
-  private readonly backendClient: BackendClient;
+import {APIClient} from '../service/APIClientSingleton';
 
-  // tslint:disable-next-line:typedef
-  static get CONFIG() {
-    return {
-      URL_PROPERTIES: '/properties',
-    };
-  }
-
-  /**
-   * Construct a new Properties Service.
-   * @param {BackendClient} backendClient - Client for the API calls
-   */
-  constructor(backendClient: BackendClient) {
-    this.backendClient = backendClient;
-  }
+export class PropertiesService {
+  constructor(private readonly apiClient = container.resolve(APIClient)) {}
 
   /**
    * Clear all properties store for the user.
    * @see https://staging-nginz-https.zinfra.io/swagger-ui/#!/users/clearProperties
-   * @returns {Promise} Resolves when all properties for user have been cleared
+   * @returns Resolves when all properties for user have been cleared
    */
   deleteProperties(): Promise<void> {
-    return this.backendClient.sendRequest({
-      type: 'DELETE',
-      url: PropertiesService.CONFIG.URL_PROPERTIES,
-    });
+    return this.apiClient.user.api.deleteProperties();
   }
 
   deletePropertiesByKey(key: string): Promise<void> {
-    return this.backendClient.sendRequest({
-      type: 'DELETE',
-      url: `${PropertiesService.CONFIG.URL_PROPERTIES}/${key}`,
-    });
+    return this.apiClient.user.api.deleteProperty(key);
   }
 
-  getProperties(): Promise<void> {
-    return this.backendClient.sendRequest({
-      type: 'GET',
-      url: PropertiesService.CONFIG.URL_PROPERTIES,
-    });
+  getProperties(): Promise<string[]> {
+    return this.apiClient.user.api.getProperties();
   }
 
-  getPropertiesByKey(key: string): Promise<any> {
-    return this.backendClient.sendRequest({
-      type: 'GET',
-      url: `${PropertiesService.CONFIG.URL_PROPERTIES}/${key}`,
-    });
+  getPropertiesByKey<T = any>(key: string): Promise<T> {
+    return this.apiClient.user.api.getProperty<T>(key);
   }
 
-  putPropertiesByKey<T extends Record<string, any>>(key: keyof T, properties: T): Promise<void> {
-    return this.backendClient.sendJson({
-      data: properties,
-      type: 'PUT',
-      url: `${PropertiesService.CONFIG.URL_PROPERTIES}/${key}`,
-    });
+  putPropertiesByKey<T extends Record<string, any>>(key: string, properties: T): Promise<void> {
+    return this.apiClient.user.api.putProperty<T>(key, properties);
   }
 }
-
-export {PropertiesService};

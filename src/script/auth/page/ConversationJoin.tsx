@@ -22,7 +22,6 @@ import {
   Button,
   COLOR,
   ContainerXS,
-  ErrorMessage,
   Form,
   H2,
   Input,
@@ -33,11 +32,12 @@ import {
   Text,
 } from '@wireapp/react-ui-kit';
 import React, {useEffect, useState} from 'react';
-import {FormattedHTMLMessage, useIntl} from 'react-intl';
+import {FormattedMessage, useIntl} from 'react-intl';
 import {connect} from 'react-redux';
 import {Redirect} from 'react-router';
 import {AnyAction, Dispatch} from 'redux';
 import {noop} from 'Util/util';
+import type {RegisterData} from '@wireapp/api-client/src/auth';
 import {Config} from '../../Config';
 import {conversationJoinStrings} from '../../strings';
 import AppAlreadyOpen from '../component/AppAlreadyOpen';
@@ -53,11 +53,11 @@ import * as AuthSelector from '../module/selector/AuthSelector';
 import * as ConversationSelector from '../module/selector/ConversationSelector';
 import * as SelfSelector from '../module/selector/SelfSelector';
 import {QUERY_KEY, ROUTE} from '../route';
-import {isPwaSupportedBrowser} from '../Runtime';
+import {Runtime} from '@wireapp/commons';
 import * as AccentColor from '../util/AccentColor';
 import {parseError, parseValidationErrors} from '../util/errorUtil';
 import * as StringUtil from '../util/stringUtil';
-import {getURLParameter, hasURLParameter, pathWithParams} from '../util/urlUtil';
+import {UrlUtil} from '@wireapp/commons';
 
 interface Props extends React.HTMLProps<HTMLDivElement> {}
 
@@ -77,21 +77,25 @@ const ConversationJoin = ({
   const {formatMessage: _} = useIntl();
 
   const [accentColor] = useState(AccentColor.random());
-  const [isPwaEnabled, setIsPwaEnabled] = useState();
-  const [conversationCode, setConversationCode] = useState();
-  const [conversationKey, setConversationKey] = useState();
-  const [enteredName, setEnteredName] = useState();
-  const [error, setError] = useState();
-  const [expiresIn, setExpiresIn] = useState();
+  const [isPwaEnabled, setIsPwaEnabled] = useState<boolean>();
+  const [conversationCode, setConversationCode] = useState<string>();
+  const [conversationKey, setConversationKey] = useState<string>();
+  const [enteredName, setEnteredName] = useState<string>();
+  const [error, setError] = useState<any>();
+  const [expiresIn, setExpiresIn] = useState<number>();
   const [forceNewTemporaryGuestAccount, setForceNewTemporaryGuestAccount] = useState(false);
   const [isValidLink, setIsValidLink] = useState(true);
   const [isValidName, setIsValidName] = useState(true);
   const [showCookiePolicyBanner, setShowCookiePolicyBanner] = useState(true);
 
+  const isPwaSupportedBrowser = () => {
+    return Runtime.isMobileOS() || Runtime.isSafari();
+  };
+
   useEffect(() => {
-    const localConversationCode = getURLParameter(QUERY_KEY.CONVERSATION_CODE);
-    const localConversationKey = getURLParameter(QUERY_KEY.CONVERSATION_KEY);
-    const localExpiresIn = parseInt(getURLParameter(QUERY_KEY.JOIN_EXPIRES), 10) || undefined;
+    const localConversationCode = UrlUtil.getURLParameter(QUERY_KEY.CONVERSATION_CODE);
+    const localConversationKey = UrlUtil.getURLParameter(QUERY_KEY.CONVERSATION_KEY);
+    const localExpiresIn = parseInt(UrlUtil.getURLParameter(QUERY_KEY.JOIN_EXPIRES), 10) || undefined;
 
     setConversationCode(localConversationCode);
     setConversationKey(localConversationKey);
@@ -110,7 +114,8 @@ const ConversationJoin = ({
   }, []);
 
   useEffect(() => {
-    const isEnabled = Config.URL.MOBILE_BASE && hasURLParameter(QUERY_KEY.PWA_AWARE) && isPwaSupportedBrowser();
+    const isEnabled =
+      Config.getConfig().URL.MOBILE_BASE && UrlUtil.hasURLParameter(QUERY_KEY.PWA_AWARE) && isPwaSupportedBrowser();
     setIsPwaEnabled(isEnabled);
     if (isEnabled) {
       setForceNewTemporaryGuestAccount(true);
@@ -119,8 +124,8 @@ const ConversationJoin = ({
 
   const routeToApp = () => {
     const redirectLocation = isPwaEnabled
-      ? pathWithParams(EXTERNAL_ROUTE.PWA_LOGIN, QUERY_KEY.IMMEDIATE_LOGIN)
-      : pathWithParams(EXTERNAL_ROUTE.WEBAPP);
+      ? UrlUtil.pathWithParams(EXTERNAL_ROUTE.PWA_LOGIN, {[QUERY_KEY.IMMEDIATE_LOGIN]: 'true'})
+      : UrlUtil.pathWithParams(EXTERNAL_ROUTE.WEBAPP);
     window.location.replace(redirectLocation);
   };
 
@@ -138,7 +143,7 @@ const ConversationJoin = ({
           expires_in: expiresIn,
           name,
         };
-        await doRegisterWireless(registrationData, {
+        await doRegisterWireless(registrationData as RegisterData, {
           shouldInitializeClient: !isPwaEnabled,
         });
         const conversationEvent = await doJoinConversationByCode(conversationKey, conversationCode);
@@ -153,14 +158,12 @@ const ConversationJoin = ({
               );
               if (!isValidationError) {
                 doLogout();
-                // tslint:disable-next-line:no-console
                 console.warn('Unable to create wireless account', error);
               }
             }
           }
         } else {
           await doLogout();
-          // tslint:disable-next-line:no-console
           console.warn('Unable to create wireless account', error);
         }
       }
@@ -197,9 +200,15 @@ const ConversationJoin = ({
               color={COLOR.GRAY}
               data-uie-name="status-full-headline"
             >
-              <FormattedHTMLMessage
+              <FormattedMessage
                 {...conversationJoinStrings.fullConversationHeadline}
-                values={{brandName: Config.BRAND_NAME}}
+                values={{
+                  brandName: Config.getConfig().BRAND_NAME,
+                  // eslint-disable-next-line react/display-name
+                  newline: <br />,
+                  // eslint-disable-next-line react/display-name
+                  strong: (...chunks: any[]) => <strong style={{color: 'black'}}>{chunks}</strong>,
+                }}
               />
             </H2>
             <Text style={{fontSize: '16px', marginTop: '10px'}} data-uie-name="status-full-text">
@@ -210,10 +219,24 @@ const ConversationJoin = ({
           <ContainerXS style={{margin: 'auto 0'}}>
             <AppAlreadyOpen fullscreen={isPwaEnabled} />
             <H2 style={{fontWeight: 500, marginBottom: '10px', marginTop: '0'}} color={COLOR.GRAY}>
-              <FormattedHTMLMessage {...conversationJoinStrings.headline} values={{brandName: Config.BRAND_NAME}} />
+              <FormattedMessage
+                {...conversationJoinStrings.headline}
+                values={{
+                  brandName: Config.getConfig().BRAND_NAME,
+                  // eslint-disable-next-line react/display-name
+                  newline: <br />,
+                  // eslint-disable-next-line react/display-name
+                  strong: (...chunks: any[]) => <strong style={{color: 'black'}}>{chunks}</strong>,
+                }}
+              />
             </H2>
             <Text style={{fontSize: '16px', marginTop: '10px'}}>
-              <FormattedHTMLMessage {...conversationJoinStrings.subhead} />
+              <FormattedMessage
+                {...conversationJoinStrings.subhead}
+                values={{
+                  newline: <br />,
+                }}
+              />
             </Text>
             <Form style={{marginTop: 30}}>
               <InputSubmitCombo>
@@ -244,9 +267,7 @@ const ConversationJoin = ({
                   <ArrowIcon />
                 </RoundIconButton>
               </InputSubmitCombo>
-              <ErrorMessage data-uie-name="error-message">
-                {error ? parseValidationErrors(error) : parseError(conversationError)}
-              </ErrorMessage>
+              {error ? parseValidationErrors(error) : parseError(conversationError)}
             </Form>
             {!isPwaEnabled && (
               <Small block>
@@ -270,12 +291,21 @@ const ConversationJoin = ({
               data-uie-name="status-join-headline"
             >
               {selfName ? (
-                <FormattedHTMLMessage
+                <FormattedMessage
                   {...conversationJoinStrings.existentAccountHeadline}
-                  values={{brandName: Config.BRAND_NAME, name: StringUtil.capitalize(selfName)}}
+                  values={{
+                    brandName: Config.getConfig().BRAND_NAME,
+                    name: StringUtil.capitalize(selfName),
+                    newline: <br />,
+                    // eslint-disable-next-line react/display-name
+                    strong: (...chunks: any[]) => <strong style={{color: 'black'}}>{chunks}</strong>,
+                  }}
                 />
               ) : (
-                <FormattedHTMLMessage {...conversationJoinStrings.headline} values={{brandName: Config.BRAND_NAME}} />
+                <FormattedMessage
+                  {...conversationJoinStrings.headline}
+                  values={{brandName: Config.getConfig().BRAND_NAME}}
+                />
               )}
             </H2>
             <Text block style={{fontSize: '16px', marginTop: '10px'}}>
@@ -288,17 +318,14 @@ const ConversationJoin = ({
                   await doJoinConversationByCode(conversationKey, conversationCode);
                   routeToApp();
                 } catch (error) {
-                  // tslint:disable-next-line:no-console
                   console.warn('Unable to join conversation with existing account', error);
                 }
               }}
               data-uie-name="do-open"
             >
-              {_(conversationJoinStrings.existentAccountOpenButton, {brandName: Config.BRAND_NAME})}
+              {_(conversationJoinStrings.existentAccountOpenButton, {brandName: Config.getConfig().BRAND_NAME})}
             </Button>
-            <ErrorMessage data-uie-name="error-message">
-              {error ? parseValidationErrors(error) : parseError(conversationError)}
-            </ErrorMessage>
+            {error ? parseValidationErrors(error) : parseError(conversationError)}
             <Small block>
               <Link
                 onClick={() => setForceNewTemporaryGuestAccount(true)}

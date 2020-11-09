@@ -38,6 +38,7 @@ import {connect} from 'react-redux';
 import {AnyAction, Dispatch} from 'redux';
 import useReactRouter from 'use-react-router';
 import {getLogger} from 'Util/Logger';
+import {StatusCodes as HTTP_STATUS} from 'http-status-codes';
 
 import {Config} from '../../Config';
 import {ssoLoginStrings} from '../../strings';
@@ -48,12 +49,13 @@ import {RootState, bindActionCreators} from '../module/reducer';
 import {ROUTE} from '../route';
 import Page from './Page';
 import SingleSignOnForm from './SingleSignOnForm';
+import * as AuthSelector from '../module/selector/AuthSelector';
 
 interface Props extends React.HTMLAttributes<HTMLDivElement> {}
 
 const logger = getLogger('SingleSignOn');
 
-const SingleSignOn = ({}: Props & ConnectedProps & DispatchProps) => {
+const SingleSignOn = ({hasDefaultSSOCode}: Props & ConnectedProps & DispatchProps) => {
   const {formatMessage: _} = useIntl();
   const ssoWindowRef = useRef<Window>();
   const {match} = useReactRouter<{code?: string}>();
@@ -77,16 +79,19 @@ const SingleSignOn = ({}: Props & ConnectedProps & DispatchProps) => {
       };
 
       onReceiveChildWindowMessage = (event: MessageEvent) => {
-        const isExpectedOrigin = event.origin === Config.BACKEND_REST;
+        // We need to copy properties to `JSON.stringify` because `event` is not serializable
+        const serializedEvent = JSON.stringify({data: event.data, origin: event.origin});
+        logger.log(`Received SSO login event from wrapper: ${serializedEvent}`, event);
+        const isExpectedOrigin = event.origin === Config.getConfig().BACKEND_REST;
         if (!isExpectedOrigin) {
           onChildWindowClose();
           ssoWindowRef.current.close();
           return reject(
             new BackendError({
-              code: 500,
+              code: HTTP_STATUS.INTERNAL_SERVER_ERROR,
               label: BackendError.LABEL.SSO_GENERIC_ERROR,
-              message: `Origin "${event.origin}" of event "${JSON.stringify(event)}" not matching "${
-                Config.BACKEND_REST
+              message: `Origin "${event.origin}" of event "${serializedEvent}" not matching "${
+                Config.getConfig().BACKEND_REST
               }"`,
             }),
           );
@@ -99,19 +104,20 @@ const SingleSignOn = ({}: Props & ConnectedProps & DispatchProps) => {
             ssoWindowRef.current.close();
             return resolve();
           }
-          case 'AUTH_ERROR': {
+          case 'AUTH_ERROR':
+          case 'AUTH_ERROR_COOKIE': {
             onChildWindowClose();
             ssoWindowRef.current.close();
             return reject(
               new BackendError({
-                code: 401,
+                code: HTTP_STATUS.UNAUTHORIZED,
                 label: event.data.payload.label || BackendError.LABEL.SSO_GENERIC_ERROR,
                 message: `Authentication error: "${JSON.stringify(event.data.payload)}"`,
               }),
             );
           }
           default: {
-            logger.warn(`Received unmatched event type: "${JSON.stringify(event)}"`);
+            logger.warn(`Received unmatched event type: "${eventType}"`);
           }
         }
       };
@@ -120,7 +126,7 @@ const SingleSignOn = ({}: Props & ConnectedProps & DispatchProps) => {
       const childPosition = calculateChildPosition(POPUP_HEIGHT, POPUP_WIDTH);
 
       ssoWindowRef.current = window.open(
-        `${Config.BACKEND_REST}/sso/initiate-login/${code}`,
+        `${Config.getConfig().BACKEND_REST}/sso/initiate-login/${code}`,
         'WIRE_SSO',
         `
           height=${POPUP_HEIGHT},
@@ -173,7 +179,7 @@ const SingleSignOn = ({}: Props & ConnectedProps & DispatchProps) => {
   };
   const focusChildWindow = () => ssoWindowRef.current && ssoWindowRef.current.focus();
   const backArrow = (
-    <RouterLink to={ROUTE.LOGIN} data-uie-name="go-login">
+    <RouterLink to={ROUTE.INDEX} data-uie-name="go-login">
       <ArrowIcon direction="left" color={COLOR.TEXT} style={{opacity: 0.56}} />
     </RouterLink>
   );
@@ -212,15 +218,17 @@ const SingleSignOn = ({}: Props & ConnectedProps & DispatchProps) => {
           </Container>
         </Overlay>
       )}
-      <IsMobile>
-        <div style={{margin: 16}}>{backArrow}</div>
-      </IsMobile>
+      {!hasDefaultSSOCode && (
+        <IsMobile>
+          <div style={{margin: 16}}>{backArrow}</div>
+        </IsMobile>
+      )}
       <Container centerText verticalCenter style={{width: '100%'}}>
         <AppAlreadyOpen />
         <Columns>
           <IsMobile not>
             <Column style={{display: 'flex'}}>
-              <div style={{margin: 'auto'}}>{backArrow}</div>
+              {!hasDefaultSSOCode && <div style={{margin: 'auto'}}>{backArrow}</div>}
             </Column>
           </IsMobile>
           <Column style={{flexBasis: 384, flexGrow: 0, padding: 0}}>
@@ -230,8 +238,21 @@ const SingleSignOn = ({}: Props & ConnectedProps & DispatchProps) => {
             >
               <div>
                 <H1 center>{_(ssoLoginStrings.headline)}</H1>
-                <Muted>{_(ssoLoginStrings.subhead)}</Muted>
-                <SingleSignOnForm handleSSOWindow={handleSSOWindow} initialCode={match.params.code} />
+                {Config.getConfig().FEATURE.ENABLE_DOMAIN_DISCOVERY ? (
+                  <>
+                    <Muted center style={{display: 'block'}} data-uie-name="status-email-or-sso-code">
+                      {_(ssoLoginStrings.subheadCodeOrEmail)}
+                    </Muted>
+                    <Muted center style={{display: 'block'}} data-uie-name="status-email-environment-switch-warning">
+                      {_(ssoLoginStrings.subheadEmailEnvironmentSwitchWarning, {
+                        brandName: Config.getConfig().BRAND_NAME,
+                      })}
+                    </Muted>
+                  </>
+                ) : (
+                  <Muted data-uie-name="status-sso-code">{_(ssoLoginStrings.subheadCode)}</Muted>
+                )}
+                <SingleSignOnForm doLogin={handleSSOWindow} initialCode={match.params.code} />
               </div>
             </ContainerXS>
           </Column>
@@ -243,7 +264,9 @@ const SingleSignOn = ({}: Props & ConnectedProps & DispatchProps) => {
 };
 
 type ConnectedProps = ReturnType<typeof mapStateToProps>;
-const mapStateToProps = (state: RootState) => ({});
+const mapStateToProps = (state: RootState) => ({
+  hasDefaultSSOCode: AuthSelector.hasDefaultSSOCode(state),
+});
 
 type DispatchProps = ReturnType<typeof mapDispatchToProps>;
 const mapDispatchToProps = (dispatch: Dispatch<AnyAction>) => bindActionCreators({}, dispatch);

@@ -16,16 +16,17 @@
  * along with this program. If not, see http://www.gnu.org/licenses/.
  *
  */
+
 import {amplify} from 'amplify';
-import UUID from 'uuidjs';
+import {WebAppEvents} from '@wireapp/webapp-events';
+import {USER_EVENT} from '@wireapp/api-client/src/event';
 
 import {PreferenceNotificationRepository} from 'src/script/notification/PreferenceNotificationRepository';
 import {PropertiesRepository} from 'src/script/properties/PropertiesRepository';
-import {BackendEvent} from 'src/script/event/Backend';
-import {WebAppEvents} from 'src/script/event/WebApp';
+import {createRandomUuid} from 'Util/util';
 
 describe('PreferenceNotificationRepository', () => {
-  const user = {id: UUID.genV4().hexString};
+  const user = {id: createRandomUuid()};
   const userObservable = () => user;
 
   beforeEach(() => {
@@ -42,11 +43,12 @@ describe('PreferenceNotificationRepository', () => {
   });
 
   it('adds new notification when read receipt settings are changed', () => {
+    amplify.unsubscribeAll(WebAppEvents.USER.EVENT_FROM_BACKEND);
     const preferenceNotificationRepository = new PreferenceNotificationRepository(userObservable);
 
     amplify.publish(WebAppEvents.USER.EVENT_FROM_BACKEND, {
       key: PropertiesRepository.CONFIG.WIRE_RECEIPT_MODE.key,
-      type: BackendEvent.USER.PROPERTIES_SET,
+      type: USER_EVENT.PROPERTIES_SET,
       value: true,
     });
 
@@ -58,6 +60,7 @@ describe('PreferenceNotificationRepository', () => {
   });
 
   it('adds new notification when new device is added for self user', () => {
+    amplify.unsubscribeAll(WebAppEvents.USER.CLIENT_ADDED);
     const preferenceNotificationRepository = new PreferenceNotificationRepository(userObservable);
     const newClientData = {};
 
@@ -71,10 +74,11 @@ describe('PreferenceNotificationRepository', () => {
   });
 
   it('ignores new device notification if not from the self user', () => {
+    amplify.unsubscribeAll(WebAppEvents.USER.CLIENT_ADDED);
     const preferenceNotificationRepository = new PreferenceNotificationRepository(userObservable);
     const newClientData = {};
 
-    amplify.publish(WebAppEvents.USER.CLIENT_ADDED, UUID.genV4().hexString, newClientData);
+    amplify.publish(WebAppEvents.USER.CLIENT_ADDED, createRandomUuid(), newClientData);
 
     expect(preferenceNotificationRepository.notifications().length).toBe(0);
   });

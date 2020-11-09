@@ -17,18 +17,20 @@
  *
  */
 
-import {Environment} from './Environment';
+import {Runtime} from '@wireapp/commons';
 
 export const KEY = {
-  ARROW_DOWN: Environment.browser.edge ? 'Down' : 'ArrowDown',
-  ARROW_LEFT: Environment.browser.edge ? 'Left' : 'ArrowLeft',
-  ARROW_RIGHT: Environment.browser.edge ? 'Right' : 'ArrowRight',
-  ARROW_UP: Environment.browser.edge ? 'Up' : 'ArrowUp',
+  ARROW_DOWN: Runtime.isEdge() ? 'Down' : 'ArrowDown',
+  ARROW_LEFT: Runtime.isEdge() ? 'Left' : 'ArrowLeft',
+  ARROW_RIGHT: Runtime.isEdge() ? 'Right' : 'ArrowRight',
+  ARROW_UP: Runtime.isEdge() ? 'Up' : 'ArrowUp',
   BACKSPACE: 'Backspace',
   DELETE: 'Delete',
   ENTER: 'Enter',
   ESC: 'Escape',
   KEY_V: 'v',
+  PAGE_DOWN: 'PageDown',
+  PAGE_UP: 'PageUp',
   SPACE: ' ',
   TAB: 'Tab',
 };
@@ -42,12 +44,17 @@ export const isOneOfKeys = (keyboardEvent: KeyboardEvent, expectedKeys: string[]
 export const isArrowKey = (keyboardEvent: KeyboardEvent): boolean =>
   isOneOfKeys(keyboardEvent, [KEY.ARROW_DOWN, KEY.ARROW_LEFT, KEY.ARROW_RIGHT, KEY.ARROW_UP]);
 
+export const isPageUpDownKey = (keyboardEvent: KeyboardEvent): boolean =>
+  isOneOfKeys(keyboardEvent, [KEY.PAGE_UP, KEY.PAGE_DOWN]);
+
 export const isKey = (keyboardEvent?: KeyboardEvent, expectedKey = '') => {
   const eventKey = keyboardEvent?.key.toLowerCase() || '';
   return eventKey === expectedKey.toLowerCase();
 };
 
 export const isEnterKey = (keyboardEvent: KeyboardEvent): boolean => isKey(keyboardEvent, KEY.ENTER);
+
+export const isSpaceKey = (keyboardEvent: KeyboardEvent): boolean => isKey(keyboardEvent, KEY.SPACE);
 
 export const isEscapeKey = (keyboardEvent: KeyboardEvent): boolean => isKey(keyboardEvent, KEY.ESC);
 

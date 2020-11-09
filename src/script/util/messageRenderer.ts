@@ -17,19 +17,19 @@
  *
  */
 
-import hljs from 'highlightjs';
+import hljs from 'highlight.js';
 import MarkdownIt from 'markdown-it';
-import Token from 'markdown-it/lib/token';
+import type Token from 'markdown-it/lib/token';
 import {escape} from 'underscore';
 
 import {replaceInRange} from './StringUtil';
 
-import {MentionEntity} from '../message/MentionEntity';
+import type {MentionEntity} from '../message/MentionEntity';
 
 interface MentionText {
+  isSelfMentioned: boolean;
   text: string;
   userId: string;
-  isSelfMentioned: boolean;
 }
 
 interface MarkdownItWithOptions extends MarkdownIt {
@@ -42,7 +42,7 @@ const markdownit = new MarkdownIt('zero', {
   html: false,
   langPrefix: 'lang-',
   linkify: true,
-}).enable(['autolink', 'backticks', 'code', 'emphasis', 'fence', 'link', 'linkify', 'newline']);
+}).enable(['autolink', 'backticks', 'code', 'emphasis', 'escape', 'fence', 'heading', 'link', 'linkify', 'newline']);
 
 const originalFenceRule = markdownit.renderer.rules.fence;
 
@@ -51,6 +51,9 @@ markdownit.renderer.rules.fence = (tokens, idx, options, env, self) => {
   tokens[idx].map[1] += 1;
   return highlighted.replace(/\n$/, '');
 };
+
+markdownit.renderer.rules.heading_open = () => '<div class="md-heading">';
+markdownit.renderer.rules.heading_close = () => '</div>';
 
 markdownit.renderer.rules.softbreak = () => '<br>';
 markdownit.renderer.rules.hardbreak = () => '<br>';
@@ -62,7 +65,7 @@ markdownit.renderer.rules.paragraph_open = (tokens, idx) => {
     .find(({map}) => map?.length);
   const previousPosition = previousWithMap ? previousWithMap.map[1] - 1 : 0;
   const count = position - previousPosition;
-  return '<br>'.repeat(count);
+  return '<br>'.repeat(Math.max(count, 0));
 };
 markdownit.renderer.rules.paragraph_close = () => '';
 
@@ -88,6 +91,8 @@ function modifyMarkdownLinks(markdown: string): string {
   return result.join('');
 }
 
+markdownit.normalizeLinkText = text => text;
+
 export const renderMessage = (message: string, selfId: string, mentionEntities: MentionEntity[] = []) => {
   const createMentionHash = (mention: MentionEntity) => `@@${window.btoa(JSON.stringify(mention)).replace(/=/g, '')}`;
   const renderMention = (mentionData: MentionText) => {
@@ -105,7 +110,7 @@ export const renderMessage = (message: string, selfId: string, mentionEntities: 
 
   let mentionlessText = mentionEntities
     .slice()
-    // sort mentions to start with the latest mention first (in order not to have to recompute the index everytime we modify the original text)
+    // sort mentions to start with the latest mention first (in order not to have to recompute the index every time we modify the original text)
     .sort((mention1, mention2) => mention2.startIndex - mention1.startIndex)
     .reduce((strippedText, mention) => {
       const mentionText = message.slice(mention.startIndex, mention.startIndex + mention.length);
@@ -119,7 +124,7 @@ export const renderMessage = (message: string, selfId: string, mentionEntities: 
     }, message);
 
   markdownit.set({
-    highlight: function(code): string {
+    highlight: function (code): string {
       const containsMentions = mentionEntities.some(mention => {
         const hash = createMentionHash(mention);
         return code.includes(hash);
@@ -205,6 +210,12 @@ export const renderMessage = (message: string, selfId: string, mentionEntities: 
 
     return text.replace(mentionHash, mentionMarkup);
   }, mentionlessText);
-
   return parsedText;
+};
+
+export const getRenderedTextContent = (text: string): string => {
+  const renderedMessage = renderMessage(text, '');
+  const messageWithLinebreaks = renderedMessage.replace(/<br>/g, '\n');
+  const strippedMessage = messageWithLinebreaks.replace(/<.+?>/g, '');
+  return markdownit.utils.unescapeAll(strippedMessage);
 };

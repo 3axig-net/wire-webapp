@@ -17,10 +17,12 @@
  *
  */
 
+import {CONVERSATION_EVENT} from '@wireapp/api-client/src/event';
+
 import {Conversation} from 'src/script/entity/Conversation';
 import {ClientEvent} from 'src/script/event/Client';
-import {BackendEvent} from 'src/script/event/Backend';
 import {ServiceMiddleware} from 'src/script/event/preprocessor/ServiceMiddleware';
+import {TestFactory} from '../../../helper/TestFactory';
 
 describe('ServiceMiddleware', () => {
   const testFactory = new TestFactory();
@@ -28,7 +30,7 @@ describe('ServiceMiddleware', () => {
 
   beforeEach(() => {
     return testFactory.exposeConversationActors().then(() => {
-      serviceMiddleware = new ServiceMiddleware(TestFactory.conversation_repository, TestFactory.user_repository);
+      serviceMiddleware = new ServiceMiddleware(testFactory.conversation_repository, testFactory.user_repository);
     });
   });
 
@@ -39,11 +41,12 @@ describe('ServiceMiddleware', () => {
           data: {
             user_ids: ['not-a-service', 'a-service'],
           },
-          type: BackendEvent.CONVERSATION.MEMBER_JOIN,
+          type: CONVERSATION_EVENT.MEMBER_JOIN,
         };
 
+        spyOn(serviceMiddleware['userState'], 'self').and.returnValue({id: 'self-id'});
         const userEntities = [{}, {isService: true}];
-        spyOn(TestFactory.user_repository, 'get_users_by_id').and.returnValue(Promise.resolve(userEntities));
+        spyOn(testFactory.user_repository, 'getUsersById').and.returnValue(Promise.resolve(userEntities));
 
         return serviceMiddleware.processEvent(event).then(decoratedEvent => {
           expect(decoratedEvent.data.has_service).toBe(true);
@@ -55,16 +58,16 @@ describe('ServiceMiddleware', () => {
           data: {
             user_ids: ['self-id'],
           },
-          type: BackendEvent.CONVERSATION.MEMBER_JOIN,
+          type: CONVERSATION_EVENT.MEMBER_JOIN,
         };
 
-        spyOn(TestFactory.user_repository, 'self').and.returnValue({id: 'self-id'});
+        spyOn(serviceMiddleware['userState'], 'self').and.returnValue({id: 'self-id'});
         const conversation = new Conversation();
-        spyOn(TestFactory.conversation_repository, 'get_conversation_by_id').and.returnValue(
+        spyOn(testFactory.conversation_repository, 'get_conversation_by_id').and.returnValue(
           Promise.resolve(conversation),
         );
         const userEntities = [{}, {isService: true}];
-        spyOn(TestFactory.user_repository, 'get_users_by_id').and.returnValue(Promise.resolve(userEntities));
+        spyOn(testFactory.user_repository, 'getUsersById').and.returnValue(Promise.resolve(userEntities));
 
         return serviceMiddleware.processEvent(event).then(decoratedEvent => {
           expect(decoratedEvent.data.has_service).toBe(true);
@@ -76,10 +79,10 @@ describe('ServiceMiddleware', () => {
           data: {
             user_ids: ['not-a-service', 'another-not-a-service'],
           },
-          type: BackendEvent.CONVERSATION.MEMBER_JOIN,
+          type: CONVERSATION_EVENT.MEMBER_JOIN,
         };
-
-        spyOn(TestFactory.user_repository, 'get_users_by_id').and.returnValue(Promise.resolve([{}, {}]));
+        spyOn(serviceMiddleware['userState'], 'self').and.returnValue({id: 'self-id'});
+        spyOn(testFactory.user_repository, 'getUsersById').and.returnValue(Promise.resolve([{}, {}]));
 
         return serviceMiddleware.processEvent(event).then(decoratedEvent => {
           expect(decoratedEvent.data.has_service).not.toBeDefined();
@@ -97,7 +100,7 @@ describe('ServiceMiddleware', () => {
         };
 
         const userEntities = [{}, {isService: true}];
-        spyOn(TestFactory.user_repository, 'get_users_by_id').and.returnValue(Promise.resolve(userEntities));
+        spyOn(testFactory.user_repository, 'getUsersById').and.returnValue(Promise.resolve(userEntities));
 
         return serviceMiddleware.processEvent(event).then(decoratedEvent => {
           expect(decoratedEvent.data.has_service).toBe(true);
@@ -113,7 +116,7 @@ describe('ServiceMiddleware', () => {
         };
 
         const userEntities = [{}, {}];
-        spyOn(TestFactory.user_repository, 'get_users_by_id').and.returnValue(Promise.resolve(userEntities));
+        spyOn(testFactory.user_repository, 'getUsersById').and.returnValue(Promise.resolve(userEntities));
 
         return serviceMiddleware.processEvent(event).then(decoratedEvent => {
           expect(decoratedEvent.data.has_service).not.toBeDefined();

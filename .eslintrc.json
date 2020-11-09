@@ -2,58 +2,41 @@
   "env": {
     "jasmine": true
   },
-  "extends": ["@wireapp/eslint-config", "plugin:jasmine/recommended"],
+  "extends": ["@wireapp/eslint-config"],
   "globals": {
     "$": true,
-    "_": true,
-    "adapter": true,
     "amplify": true,
-    "bazinga64": true,
-    "Cookies": true,
-    "cryptobox": true,
-    "dcodeIO": true,
-    "Dexie": true,
-    "DexieBatch": true,
     "entities": true,
-    "hljs": true,
     "jQuery": true,
-    "JSZip": true,
-    "keyboardJS": true,
     "ko": true,
-    "libsodium": true,
-    "linkify": true,
-    "linkifyHtml": true,
-    "Long": true,
     "lorem_ipsum": true,
-    "LRUCache": true,
-    "marked": true,
-    "moment": true,
-    "OpenGraphMocks": true,
     "payload": true,
-    "PhoneFormat": true,
-    "platform": true,
-    "poster": true,
-    "Proteus": true,
-    "Raygun": true,
     "sinon": true,
-    "sodium": true,
-    "StoreEngine": true,
-    "TestFactory": true,
-    "twttr": true,
-    "UUID": true,
     "wire": true,
-    "z": true,
-    "zeta": true
+    "z": true
   },
-  "plugins": ["jasmine"],
+  "ignorePatterns": [".git/", "docs/", "node_modules/", "resource/", "server/bin/", "server/dist/", "server/node_modules/", "src/ext/", "src/script/localization/**/webapp*.js", "src/worker/"],
+  "overrides": [
+    {
+      "files": ["*.ts", "*.tsx"],
+      "parser": "@typescript-eslint/parser",
+      "parserOptions": {
+        "project": ["./tsconfig.json", "./server/tsconfig.json"]
+      },
+      "rules": {
+        "@typescript-eslint/no-floating-promises": "off",
+        "@typescript-eslint/typedef": "off",
+        "no-dupe-class-members": "off",
+        "no-undef": "off",
+        "no-unsanitized/property": "off",
+        "no-unused-vars": "off",
+        "prefer-promise-reject-errors": "off",
+        "valid-jsdoc": "off"
+      }
+    }
+  ],
   "rules": {
     "id-length": "off",
-    "jasmine/no-expect-in-setup-teardown": "off",
-    "jasmine/no-spec-dupes": "off",
-    "jasmine/no-suite-dupes": "off",
-    "jasmine/prefer-toHaveBeenCalledWith": "off",
-    "jsdoc/require-hyphen-before-param-description": "error",
-    "no-magic-numbers": "off",
-    "sort-imports": "off"
+    "no-magic-numbers": "off"
   }
 }

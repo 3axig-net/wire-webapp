@@ -17,18 +17,10 @@
  *
  */
 
+import type {Connection as ConnectionData} from '@wireapp/api-client/src/connection/';
+
 import {Logger, getLogger} from 'Util/Logger';
 import {ConnectionEntity} from './ConnectionEntity';
-import {ConnectionStatus} from './ConnectionStatus';
-
-export interface ConnectionData {
-  conversation: string;
-  from: string;
-  last_update: string;
-  message: string;
-  status: ConnectionStatus;
-  to: string;
-}
 
 /**
  * Connection mapper to convert all server side JSON connections into core connection entities.
@@ -41,13 +33,13 @@ export class ConnectionMapper {
   }
 
   mapConnectionFromJson(connectionData: ConnectionData): ConnectionEntity {
-    const connectionEntitiy = new ConnectionEntity();
-    return this.updateConnectionFromJson(connectionEntitiy, connectionData);
+    const connectionEntity = new ConnectionEntity();
+    return this.updateConnectionFromJson(connectionEntity, connectionData);
   }
 
   /**
    * Convert multiple JSON connections into connection entities.
-   * @param connectionsData - Connection data
+   * @param connectionsData Connection data
    */
   mapConnectionsFromJson(connectionsData: ConnectionData[]): ConnectionEntity[] {
     return connectionsData.filter(Boolean).map(connectionData => this.mapConnectionFromJson(connectionData));

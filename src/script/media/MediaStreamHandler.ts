@@ -18,13 +18,13 @@
  */
 
 import {amplify} from 'amplify';
-import {Environment} from 'Util/Environment';
-import {Logger, getLogger} from 'Util/Logger';
+import {WebAppEvents} from '@wireapp/webapp-events';
+
+import {getLogger, Logger} from 'Util/Logger';
 
 import {MediaError} from '../error/MediaError';
 import {PermissionError} from '../error/PermissionError';
-import {WebAppEvents} from '../event/WebApp';
-import {PermissionRepository} from '../permission/PermissionRepository';
+import type {PermissionRepository} from '../permission/PermissionRepository';
 import {PermissionStatusState} from '../permission/PermissionStatusState';
 import {PermissionType} from '../permission/PermissionType';
 import {WarningsViewModel} from '../view_model/WarningsViewModel';
@@ -32,6 +32,8 @@ import {MediaConstraintsHandler, ScreensharingMethods} from './MediaConstraintsH
 import {MEDIA_STREAM_ERROR} from './MediaStreamError';
 import {MEDIA_STREAM_ERROR_TYPES} from './MediaStreamErrorTypes';
 import {MediaType} from './MediaType';
+import {Runtime} from '@wireapp/commons';
+import {NoAudioInputError} from '../error/NoAudioInputError';
 
 declare global {
   interface MediaDevices {
@@ -40,7 +42,6 @@ declare global {
 }
 
 export class MediaStreamHandler {
-  // tslint:disable-next-line:typedef
   static get CONFIG() {
     return {PERMISSION_HINT_DELAY: 200};
   }
@@ -61,17 +62,21 @@ export class MediaStreamHandler {
       this.screensharingMethod = ScreensharingMethods.DESKTOP_CAPTURER;
     } else if (!!navigator.mediaDevices?.getDisplayMedia) {
       this.screensharingMethod = ScreensharingMethods.DISPLAY_MEDIA;
-    } else if (Environment.browser.firefox) {
+    } else if (Runtime.isFirefox()) {
       this.screensharingMethod = ScreensharingMethods.USER_MEDIA;
     }
   }
 
-  requestMediaStream(audio: boolean, video: boolean, screen: boolean, isGroup: boolean): Promise<MediaStream> {
+  async requestMediaStream(audio: boolean, video: boolean, screen: boolean, isGroup: boolean): Promise<MediaStream> {
     const hasPermission = this.hasPermissionToAccess(audio, video);
-    return this.getMediaStream(audio, video, screen, isGroup, hasPermission).catch(error => {
+    try {
+      return await this.getMediaStream(audio, video, screen, isGroup, hasPermission);
+    } catch (error) {
       const isPermissionDenied = error.type === PermissionError.TYPE.DENIED;
-      throw isPermissionDenied ? new MediaError(MediaError.TYPE.MEDIA_STREAM_PERMISSION) : error;
-    });
+      throw isPermissionDenied
+        ? new MediaError(MediaError.TYPE.MEDIA_STREAM_PERMISSION, MediaError.MESSAGE.MEDIA_STREAM_PERMISSION)
+        : error;
+    }
   }
 
   selectScreenToShare(showScreenSelection: () => Promise<void>): Promise<void> {
@@ -83,8 +88,6 @@ export class MediaStreamHandler {
 
   /**
    * Check for permission for the requested media type.
-   *
-   * @private
    * @returns Resolves `true` when permissions is granted
    */
   private hasPermissionToAccess(audio: boolean, video: boolean): boolean {
@@ -119,21 +122,17 @@ export class MediaStreamHandler {
     return shouldCheckPermissions ? checkPermissionStates(permissionTypes) : true;
   }
 
-  releaseTracksFromStream(mediaStream: MediaStream, mediaType: MediaType): boolean {
+  releaseTracksFromStream(mediaStream: MediaStream, mediaType: MediaType): void {
     const mediaStreamTracks = this.getMediaTracks(mediaStream, mediaType);
 
-    if (mediaStreamTracks.length) {
-      mediaStreamTracks.forEach(mediaStreamTrack => {
-        mediaStream.removeTrack(mediaStreamTrack);
-        mediaStreamTrack.stop();
-        this.logger.info(`Stopping MediaStreamTrack of kind '${mediaStreamTrack.kind}' successful`, mediaStreamTrack);
-      });
-
-      return true;
-    }
-
-    this.logger.warn('No MediaStreamTrack found to stop', mediaStream);
-    return false;
+    mediaStreamTracks.forEach((mediaStreamTrack: MediaStreamTrack) => {
+      mediaStream.removeTrack(mediaStreamTrack);
+      mediaStreamTrack.stop();
+      this.logger.info(
+        `Stopped MediaStreamTrack ID '${mediaStreamTrack.id}' of kind '${mediaStreamTrack.kind}'`,
+        mediaStreamTrack,
+      );
+    });
   }
 
   private getMediaStream(
@@ -143,13 +142,13 @@ export class MediaStreamHandler {
     isGroup: boolean,
     hasPermission: boolean,
   ): Promise<MediaStream> {
-    const mediaContraints = screen
+    const mediaConstraints = screen
       ? this.constraintsHandler.getScreenStreamConstraints(this.screensharingMethod)
       : this.constraintsHandler.getMediaStreamConstraints(audio, video, isGroup);
 
-    this.logger.info(`Requesting MediaStream`, mediaContraints);
+    this.logger.info('Requesting MediaStream', mediaConstraints);
 
-    const willPromptForPermission = !hasPermission && !Environment.desktop;
+    const willPromptForPermission = !hasPermission && !Runtime.isDesktopApp();
     if (willPromptForPermission) {
       this.schedulePermissionHint(audio, video, screen);
     }
@@ -160,7 +159,7 @@ export class MediaStreamHandler {
       : navigator.mediaDevices.getUserMedia;
 
     return mediaAPI
-      .call(navigator.mediaDevices, mediaContraints)
+      .call(navigator.mediaDevices, mediaConstraints)
       .then((mediaStream: MediaStream) => {
         this.clearPermissionRequestHint(audio, video, screen);
         return mediaStream;
@@ -173,17 +172,28 @@ export class MediaStreamHandler {
           error,
         );
         this.clearPermissionRequestHint(audio, video, screen);
+        /**
+         * We only want handle errors on pure audio calls here. Video calling errors will be handled in a separate case.
+         * @see https://wearezeta.atlassian.net/browse/WEBAPP-7128
+         */
+        if (
+          audio === true &&
+          video !== true &&
+          [MEDIA_STREAM_ERROR.NOT_READABLE_ERROR, MEDIA_STREAM_ERROR.NOT_ALLOWED_ERROR].includes(name)
+        ) {
+          throw new NoAudioInputError(error);
+        }
 
         if (MEDIA_STREAM_ERROR_TYPES.DEVICE.includes(name)) {
-          throw new MediaError(MediaError.TYPE.MEDIA_STREAM_DEVICE);
+          throw new MediaError(MediaError.TYPE.MEDIA_STREAM_DEVICE, MediaError.MESSAGE.MEDIA_STREAM_DEVICE);
         }
 
         if (MEDIA_STREAM_ERROR_TYPES.MISC.includes(name)) {
-          throw new MediaError(MediaError.TYPE.MEDIA_STREAM_MISC);
+          throw new MediaError(MediaError.TYPE.MEDIA_STREAM_MISC, MediaError.MESSAGE.MEDIA_STREAM_MISC);
         }
 
         if (MEDIA_STREAM_ERROR_TYPES.PERMISSION.includes(name)) {
-          throw new MediaError(MediaError.TYPE.MEDIA_STREAM_PERMISSION);
+          throw new MediaError(MediaError.TYPE.MEDIA_STREAM_PERMISSION, MediaError.MESSAGE.MEDIA_STREAM_PERMISSION);
         }
 
         throw error;
@@ -192,7 +202,7 @@ export class MediaStreamHandler {
 
   private getMediaTracks(mediaStream: MediaStream, mediaType: MediaType = MediaType.AUDIO_VIDEO): MediaStreamTrack[] {
     if (!mediaStream) {
-      throw new MediaError(MediaError.TYPE.STREAM_NOT_FOUND);
+      throw new MediaError(MediaError.TYPE.STREAM_NOT_FOUND, MediaError.MESSAGE.STREAM_NOT_FOUND);
     }
 
     switch (mediaType) {
@@ -210,7 +220,7 @@ export class MediaStreamHandler {
       }
 
       default: {
-        throw new MediaError(MediaError.TYPE.UNHANDLED_MEDIA_TYPE);
+        throw new MediaError(MediaError.TYPE.UNHANDLED_MEDIA_TYPE, MediaError.MESSAGE.UNHANDLED_MEDIA_TYPE);
       }
     }
   }
@@ -235,13 +245,13 @@ export class MediaStreamHandler {
   }
 
   private hidePermissionRequestHint(audio: boolean, video: boolean, screen: boolean): void {
-    if (!Environment.electron) {
+    if (!Runtime.isDesktopApp()) {
       const warningType = this.selectPermissionRequestWarningType(audio, video, screen);
       amplify.publish(WebAppEvents.WARNING.DISMISS, warningType);
     }
   }
 
-  private selectPermissionDeniedWarningType(audio: boolean, video: boolean, screen: boolean): any {
+  private selectPermissionDeniedWarningType(audio: boolean, video: boolean, screen: boolean): string {
     if (video) {
       return WarningsViewModel.TYPE.DENIED_CAMERA;
     }
@@ -251,7 +261,7 @@ export class MediaStreamHandler {
     return WarningsViewModel.TYPE.DENIED_MICROPHONE;
   }
 
-  private selectPermissionRequestWarningType(audio: boolean, video: boolean, screen: boolean): any {
+  private selectPermissionRequestWarningType(audio: boolean, video: boolean, screen: boolean): string {
     if (video) {
       return WarningsViewModel.TYPE.REQUEST_CAMERA;
     }
@@ -262,7 +272,7 @@ export class MediaStreamHandler {
   }
 
   private showPermissionRequestHint(audio: boolean, video: boolean, screen: boolean): void {
-    if (!Environment.electron) {
+    if (!Runtime.isDesktopApp()) {
       const warningType = this.selectPermissionRequestWarningType(audio, video, screen);
       amplify.publish(WebAppEvents.WARNING.SHOW, warningType);
     }

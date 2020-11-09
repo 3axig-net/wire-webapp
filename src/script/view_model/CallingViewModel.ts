@@ -19,24 +19,31 @@
 
 import {CALL_TYPE, CONV_TYPE, REASON as CALL_REASON, STATE as CALL_STATE} from '@wireapp/avs';
 import {Availability} from '@wireapp/protocol-messaging';
+import {amplify} from 'amplify';
 import ko from 'knockout';
 
-import {Logger, getLogger} from 'Util/Logger';
+import {getLogger, Logger} from 'Util/Logger';
 
 import {AudioType} from '../audio/AudioType';
-import {Call} from '../calling/Call';
-import {CallingRepository} from '../calling/CallingRepository';
-import {Grid, getGrid} from '../calling/videoGridHandler';
-import {User} from '../entity/User';
-import {ElectronDesktopCapturerSource, MediaDevicesHandler} from '../media/MediaDevicesHandler';
-import {MediaStreamHandler} from '../media/MediaStreamHandler';
+import type {Call} from '../calling/Call';
+import type {CallingRepository} from '../calling/CallingRepository';
+import {getGrid, Grid} from '../calling/videoGridHandler';
+import type {User} from '../entity/User';
+import type {ElectronDesktopCapturerSource, MediaDevicesHandler} from '../media/MediaDevicesHandler';
+import type {MediaStreamHandler} from '../media/MediaStreamHandler';
+import type {AudioRepository} from '../audio/AudioRepository';
+import type {Conversation} from '../entity/Conversation';
+import type {PermissionRepository} from '../permission/PermissionRepository';
+import {PermissionStatusState} from '../permission/PermissionStatusState';
+import type {Multitasking} from '../notification/NotificationRepository';
+import type {TeamRepository} from '../team/TeamRepository';
 
 import 'Components/calling/chooseScreen';
-import {AudioRepository} from '../audio/AudioRepository';
-import {ConversationRepository} from '../conversation/ConversationRepository';
-import {Conversation} from '../entity/Conversation';
-import {PermissionRepository} from '../permission/PermissionRepository';
-import {PermissionStatusState} from '../permission/PermissionStatusState';
+import {WebAppEvents} from '@wireapp/webapp-events';
+import {ModalsViewModel} from './ModalsViewModel';
+import {t} from 'Util/LocalizerUtil';
+import {ConversationState} from '../conversation/ConversationState';
+import {container} from 'tsyringe';
 
 export interface CallActions {
   answer: (call: Call) => void;
@@ -45,6 +52,7 @@ export interface CallActions {
   startAudio: (conversationEntity: Conversation) => void;
   startVideo: (conversationEntity: Conversation) => void;
   switchCameraInput: (call: Call, deviceId: string) => void;
+  switchScreenInput: (call: Call, deviceId: string) => void;
   toggleCamera: (call: Call) => void;
   toggleMute: (call: Call, muteState: boolean) => void;
   toggleScreenshare: (call: Call) => void;
@@ -65,36 +73,51 @@ export class CallingViewModel {
   readonly audioRepository: AudioRepository;
   readonly callActions: CallActions;
   readonly callingRepository: CallingRepository;
-  readonly conversationRepository: ConversationRepository;
   readonly isChoosingScreen: ko.PureComputed<boolean>;
   readonly mediaDevicesHandler: MediaDevicesHandler;
   readonly mediaStreamHandler: MediaStreamHandler;
-  readonly multitasking: any;
+  readonly multitasking: Multitasking;
   readonly permissionRepository: PermissionRepository;
   readonly selectableScreens: ko.Observable<ElectronDesktopCapturerSource[]>;
+  readonly selectableWindows: ko.Observable<ElectronDesktopCapturerSource[]>;
+  readonly isSelfVerified: ko.Computed<boolean>;
+  readonly teamRepository: TeamRepository;
 
   constructor(
     callingRepository: CallingRepository,
-    conversationRepository: ConversationRepository,
     audioRepository: AudioRepository,
     mediaDevicesHandler: MediaDevicesHandler,
     mediaStreamHandler: MediaStreamHandler,
     permissionRepository: PermissionRepository,
+    teamRepository: TeamRepository,
     selfUser: ko.Observable<User>,
-    multitasking: any,
+    multitasking: Multitasking,
+    private readonly conversationState = container.resolve(ConversationState),
   ) {
     this.logger = getLogger('CallingViewModel');
     this.callingRepository = callingRepository;
-    this.conversationRepository = conversationRepository;
     this.mediaDevicesHandler = mediaDevicesHandler;
     this.mediaStreamHandler = mediaStreamHandler;
     this.permissionRepository = permissionRepository;
+    this.teamRepository = teamRepository;
+
     this.selfUser = selfUser;
+    this.isSelfVerified = ko.pureComputed(() => selfUser().is_verified());
     this.activeCalls = ko.pureComputed(() =>
-      callingRepository.activeCalls().filter(call => call.reason() !== CALL_REASON.ANSWERED_ELSEWHERE),
+      callingRepository.activeCalls().filter(call => {
+        const conversation = this.conversationState.findConversation(call.conversationId);
+        if (!conversation || conversation.removed_from_conversation()) {
+          return false;
+        }
+
+        return call.reason() !== CALL_REASON.ANSWERED_ELSEWHERE;
+      }),
     );
     this.selectableScreens = ko.observable([]);
-    this.isChoosingScreen = ko.pureComputed(() => this.selectableScreens().length > 0);
+    this.selectableWindows = ko.observable([]);
+    this.isChoosingScreen = ko.pureComputed(
+      () => this.selectableScreens().length > 0 || this.selectableWindows().length > 0,
+    );
     this.multitasking = multitasking;
 
     this.onChooseScreen = () => {};
@@ -106,13 +129,13 @@ export class CallingViewModel {
       };
       const initialCallState = call.state();
       const soundId = sounds[initialCallState];
-      if (!soundId || call.reason() !== undefined) {
+      if (!soundId || typeof call.reason() !== 'undefined') {
         return;
       }
 
       audioRepository.loop(soundId).then(() => {
         const stateSubscription = ko.computed(() => {
-          if (call.state() !== initialCallState || call.reason() !== undefined) {
+          if (call.state() !== initialCallState || typeof call.reason() !== 'undefined') {
             window.setTimeout(() => {
               audioRepository.stop(soundId);
               stateSubscription.dispose();
@@ -122,7 +145,7 @@ export class CallingViewModel {
       });
     };
 
-    const startCall = (conversationEntity: any, callType: CALL_TYPE): void => {
+    const startCall = (conversationEntity: Conversation, callType: CALL_TYPE): void => {
       const convType = conversationEntity.isGroup() ? CONV_TYPE.GROUP : CONV_TYPE.ONEONONE;
       this.callingRepository.startCall(conversationEntity.id, convType, callType).then(call => {
         if (!call) {
@@ -141,8 +164,23 @@ export class CallingViewModel {
 
     this.callActions = {
       answer: (call: Call) => {
-        const callType = call.selfParticipant.sharesCamera() ? call.initialType : CALL_TYPE.NORMAL;
-        this.callingRepository.answerCall(call, callType);
+        if (call.conversationType === CONV_TYPE.CONFERENCE && !this.callingRepository.supportsConferenceCalling) {
+          amplify.publish(WebAppEvents.WARNING.MODAL, ModalsViewModel.TYPE.ACKNOWLEDGE, {
+            primaryAction: {
+              action: () => {
+                this.callingRepository.rejectCall(call.conversationId);
+              },
+            },
+            text: {
+              message: `${t('modalConferenceCallNotSupportedMessage')} ${t(
+                'modalConferenceCallNotSupportedJoinMessage',
+              )}`,
+              title: t('modalConferenceCallNotSupportedHeadline'),
+            },
+          });
+        } else {
+          this.callingRepository.answerCall(call);
+        }
       },
       leave: (call: Call) => {
         this.callingRepository.leaveCall(call.conversationId);
@@ -150,23 +188,26 @@ export class CallingViewModel {
       reject: (call: Call) => {
         this.callingRepository.rejectCall(call.conversationId);
       },
-      startAudio: (conversationEntity: any): void => {
+      startAudio: (conversationEntity: Conversation): void => {
         startCall(conversationEntity, CALL_TYPE.NORMAL);
       },
-      startVideo(conversationEntity: any): void {
+      startVideo(conversationEntity: Conversation): void {
         startCall(conversationEntity, CALL_TYPE.VIDEO);
       },
       switchCameraInput: (call: Call, deviceId: string) => {
         this.mediaDevicesHandler.currentDeviceId.videoInput(deviceId);
       },
+      switchScreenInput: (call: Call, deviceId: string) => {
+        this.mediaDevicesHandler.currentDeviceId.screenInput(deviceId);
+      },
       toggleCamera: (call: Call) => {
         this.callingRepository.toggleCamera(call);
       },
       toggleMute: (call: Call, muteState: boolean) => {
-        this.callingRepository.muteCall(call.conversationId, muteState);
+        this.callingRepository.muteCall(call, muteState);
       },
-      toggleScreenshare: (call: Call) => {
-        if (call.selfParticipant.sharesScreen()) {
+      toggleScreenshare: async (call: Call): Promise<void> => {
+        if (call.getSelfParticipant().sharesScreen()) {
           return this.callingRepository.toggleScreenshare(call);
         }
         const showScreenSelection = (): Promise<void> => {
@@ -174,18 +215,25 @@ export class CallingViewModel {
             this.onChooseScreen = (deviceId: string): void => {
               this.mediaDevicesHandler.currentDeviceId.screenInput(deviceId);
               this.selectableScreens([]);
+              this.selectableWindows([]);
               resolve();
             };
             this.mediaDevicesHandler.getScreenSources().then((sources: ElectronDesktopCapturerSource[]) => {
               if (sources.length === 1) {
                 return this.onChooseScreen(sources[0].id);
               }
-              this.selectableScreens(sources);
+              this.selectableScreens(sources.filter(source => source.id.startsWith('screen')));
+              this.selectableWindows(sources.filter(source => source.id.startsWith('window')));
             });
           });
         };
 
         this.mediaStreamHandler.selectScreenToShare(showScreenSelection).then(() => {
+          const isAudioCall = [CALL_TYPE.NORMAL, CALL_TYPE.FORCED_AUDIO].includes(call.initialType);
+          const isFullScreenVideoCall = call.initialType === CALL_TYPE.VIDEO && !this.multitasking.isMinimized();
+          if (isAudioCall || isFullScreenVideoCall) {
+            this.multitasking.isMinimized(true);
+          }
           return this.callingRepository.toggleScreenshare(call);
         });
       },
@@ -212,12 +260,12 @@ export class CallingViewModel {
     ko.computed(() => {
       const call = this.callingRepository.joinedCall();
       if (call) {
-        call.participants().forEach(participant => {
+        call.getRemoteParticipants().forEach(participant => {
           const stream = participant.audioStream();
           if (!stream) {
             return;
           }
-          const audioId = `${participant.userId}-${stream.id}`;
+          const audioId = `${participant.user.id}-${stream.id}`;
           if (
             participantsAudioElement[audioId] &&
             (participantsAudioElement[audioId].srcObject as MediaStream).active
@@ -269,12 +317,11 @@ export class CallingViewModel {
   }
 
   getVideoGrid(call: Call): ko.PureComputed<Grid> {
-    return getGrid(call.participants, call.selfParticipant);
+    return getGrid(call);
   }
 
   hasVideos(call: Call): boolean {
-    const callParticipants = call.participants().concat(call.selfParticipant);
-    return !!callParticipants.find(participant => participant.hasActiveVideo());
+    return !!call.participants().find(participant => participant.hasActiveVideo());
   }
 
   isIdle(call: Call): boolean {
@@ -298,7 +345,7 @@ export class CallingViewModel {
   }
 
   getConversationById(conversationId: string): Conversation {
-    return this.conversationRepository.find_conversation_by_id(conversationId);
+    return this.conversationState.findConversation(conversationId);
   }
 
   hasAccessToCamera(): boolean {
@@ -307,5 +354,6 @@ export class CallingViewModel {
 
   onCancelScreenSelection = () => {
     this.selectableScreens([]);
+    this.selectableWindows([]);
   };
 }

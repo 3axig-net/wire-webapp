@@ -17,6 +17,8 @@
  *
  */
 
+/* cspell:disable */
+
 export interface CountryCode {
   code: number;
   iso: string;
@@ -1469,7 +1471,7 @@ export const COUNTRY_CODES: CountryCode[] = [
 
 /**
  * Get the country code matching to an ISO name
- * @param countryCode - Country code
+ * @param countryCode Country code
  * @returns Returns the ISO standard country name of the most populated country with the matching country code
  */
 export const getCountryByCode = (countryCode: string): string | void => {
@@ -1484,7 +1486,7 @@ export const getCountryByCode = (countryCode: string): string | void => {
 
 /**
  * Get the country code matching an ISO name
- * @param isoName - ISO standard country name
+ * @param isoName ISO standard country name
  * @returns Matching country code
  */
 export const getCountryCode = (isoName: string): number | void => {

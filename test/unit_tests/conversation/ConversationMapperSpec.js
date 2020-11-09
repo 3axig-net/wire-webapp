@@ -17,18 +17,17 @@
  *
  */
 
-import UUID from 'uuidjs';
-
+import {CONVERSATION_TYPE} from '@wireapp/api-client/src/conversation';
 import {createRandomUuid} from 'Util/util';
 
 import {Conversation} from 'src/script/entity/Conversation';
 import {ConversationMapper} from 'src/script/conversation/ConversationMapper';
 import {NOTIFICATION_STATE} from 'src/script/conversation/NotificationSetting';
-import {ConversationType} from 'src/script/conversation/ConversationType';
 import {ConversationStatus} from 'src/script/conversation/ConversationStatus';
 import {BaseError} from 'src/script/error/BaseError';
+import {ConversationError} from 'src/script/error/ConversationError';
 
-describe('Conversation Mapper', () => {
+describe('ConversationMapper', () => {
   let conversation_mapper = null;
 
   beforeEach(() => (conversation_mapper = new ConversationMapper()));
@@ -37,23 +36,23 @@ describe('Conversation Mapper', () => {
     it('throws an error for unexpected parameters', () => {
       const functionCallUndefinedParam = () => conversation_mapper.mapConversations();
 
-      expect(functionCallUndefinedParam).toThrowError(z.error.ConversationError, BaseError.MESSAGE.MISSING_PARAMETER);
+      expect(functionCallUndefinedParam).toThrowError(ConversationError, BaseError.MESSAGE.MISSING_PARAMETER);
 
       const functionCallEmtpyArray = () => conversation_mapper.mapConversations([]);
 
-      expect(functionCallEmtpyArray).toThrowError(z.error.ConversationError, BaseError.MESSAGE.INVALID_PARAMETER);
+      expect(functionCallEmtpyArray).toThrowError(ConversationError, BaseError.MESSAGE.INVALID_PARAMETER);
 
       const functionCallWrongType = () => conversation_mapper.mapConversations('Conversation');
 
-      expect(functionCallWrongType).toThrowError(z.error.ConversationError, BaseError.MESSAGE.INVALID_PARAMETER);
+      expect(functionCallWrongType).toThrowError(ConversationError, BaseError.MESSAGE.INVALID_PARAMETER);
 
       const functionCallUndefinedInArray = () => conversation_mapper.mapConversations([undefined]);
 
-      expect(functionCallUndefinedInArray).toThrowError(z.error.ConversationError, BaseError.MESSAGE.MISSING_PARAMETER);
+      expect(functionCallUndefinedInArray).toThrowError(ConversationError, BaseError.MESSAGE.MISSING_PARAMETER);
 
       const functionCallStringInArray = () => conversation_mapper.mapConversations(['Conversation']);
 
-      expect(functionCallStringInArray).toThrowError(z.error.ConversationError, BaseError.MESSAGE.INVALID_PARAMETER);
+      expect(functionCallStringInArray).toThrowError(ConversationError, BaseError.MESSAGE.INVALID_PARAMETER);
     });
 
     it('maps a single conversation', () => {
@@ -68,20 +67,24 @@ describe('Conversation Mapper', () => {
         conversation.members.others[3].id,
       ];
 
-      expect(conversation_et.participating_user_ids()).toEqual(expected_participant_ids);
-      expect(conversation_et.id).toBe(conversation.id);
-      expect(conversation_et.getNumberOfParticipants()).toBe(conversation.members.others.length + 1);
-      expect(conversation_et.isGroup()).toBeTruthy();
-      expect(conversation_et.name()).toBe(conversation.name);
-      expect(conversation_et.mutedState()).toBe(false);
-      expect(conversation_et.team_id).toEqual(conversation.team);
-      expect(conversation_et.type()).toBe(ConversationType.GROUP);
+      expect(conversation_et.participating_user_ids())
+        .withContext('participating_user_ids')
+        .toEqual(expected_participant_ids);
+      expect(conversation_et.id).withContext('id').toBe(conversation.id);
+      expect(conversation_et.getNumberOfParticipants())
+        .withContext('getNumberOfParticipants')
+        .toBe(conversation.members.others.length + 1);
+      expect(conversation_et.isGroup()).withContext('isGroup').toBeTruthy();
+      expect(conversation_et.name()).withContext('name').toBe(conversation.name);
+      expect(conversation_et.mutedState()).withContext('mutedState').toBe(0);
+      expect(conversation_et.team_id).withContext('team_id').toEqual(conversation.team);
+      expect(conversation_et.type()).withContext('type').toBe(CONVERSATION_TYPE.REGULAR);
 
       const expectedMutedTimestamp = new Date(conversation.members.self.otr_muted_ref).getTime();
 
-      expect(conversation_et.mutedTimestamp()).toEqual(expectedMutedTimestamp);
-      expect(conversation_et.last_event_timestamp()).toBe(initial_timestamp);
-      expect(conversation_et.last_server_timestamp()).toBe(initial_timestamp);
+      expect(conversation_et.mutedTimestamp()).withContext('mutedTimestamp').toEqual(expectedMutedTimestamp);
+      expect(conversation_et.last_event_timestamp()).withContext('last_event_timestamp').toBe(initial_timestamp);
+      expect(conversation_et.last_server_timestamp()).withContext('last_server_timestamp').toBe(initial_timestamp);
     });
 
     it('maps multiple conversations', () => {
@@ -105,9 +108,9 @@ describe('Conversation Mapper', () => {
 
     it('maps a team conversation', () => {
       // prettier-ignore
-      /* eslint-disable comma-spacing, key-spacing, sort-keys, quotes */
+      /* eslint-disable comma-spacing, key-spacing, sort-keys-fix/sort-keys-fix, quotes */
       const payload = {"access":["invite"],"creator":"f52eed1b-aa64-447f-ad4a-96529f72105f","members":{"self":{"hidden_ref":null,"status":0,"service":null,"otr_muted_ref":null,"status_time":"1970-01-01T00:00:00.000Z","hidden":false,"status_ref":"0.0","id":"39b7f597-dfd1-4dff-86f5-fe1b79cb70a0","otr_archived":false,"otr_muted":false,"otr_archived_ref":null},"others":[{"status":0,"id":"f52eed1b-aa64-447f-ad4a-96529f72105f"}]},"name":"BennyTest","team":"5316fe03-24ee-4b19-b789-6d026bd3ce5f","id":"f2520615-f860-4c72-8b90-9ace3b5f6c37","type":0,"last_event_time":"1970-01-01T00:00:00.000Z","last_event":"0.0"};
-      /* eslint-disable comma-spacing, key-spacing, sort-keys, quotes */
+      /* eslint-disable comma-spacing, key-spacing, sort-keys-fix/sort-keys-fix, quotes */
 
       const [conversation_et] = conversation_mapper.mapConversations([payload]);
 
@@ -266,18 +269,17 @@ describe('Conversation Mapper', () => {
       const self_status = {last_read_timestamp: '1480339377099'};
       const last_read_timestamp_number = window.parseInt(self_status.last_read_timestamp, 10);
       const updated_conversation_et = conversation_mapper.updateSelfStatus(conversation_et, self_status);
-
       expect(updated_conversation_et.last_read_timestamp()).toBe(last_read_timestamp_number);
     });
   });
 
   describe('mergeConversation', () => {
     function getDataWithReadReceiptMode(localReceiptMode, remoteReceiptMode) {
-      const conversationCreatorId = UUID.genV4().hexString;
-      const conversationId = UUID.genV4().hexString;
+      const conversationCreatorId = createRandomUuid();
+      const conversationId = createRandomUuid();
       const conversationName = 'Hello, World!';
-      const selfUserId = UUID.genV4().hexString;
-      const teamId = UUID.genV4().hexString;
+      const selfUserId = createRandomUuid();
+      const teamId = createRandomUuid();
 
       const localData = {
         archived_state: false,
@@ -342,42 +344,50 @@ describe('Conversation Mapper', () => {
     }
 
     // prettier-ignore
-    /* eslint-disable comma-spacing, key-spacing, sort-keys, quotes */
+    /* eslint-disable comma-spacing, key-spacing, sort-keys-fix/sort-keys-fix, quotes */
     const  remote_data = {"access": ["private"], "creator": "532af01e-1e24-4366-aacf-33b67d4ee376", "members": {"self": {"hidden_ref": null, "status": 0, "service": null, "otr_muted_ref": null, "status_time": "2015-01-07T16:26:51.363Z", "hidden": false, "status_ref": "0.0", "id": "8b497692-7a38-4a5d-8287-e3d1006577d6", "otr_archived": false, "otr_muted": false, "otr_archived_ref": "2017-02-16T10:06:41.118Z"}, "others": [{"status": 0, "id": "532af01e-1e24-4366-aacf-33b67d4ee376"}]}, "name": "Family Gathering", "team": "5316fe03-24ee-4b19-b789-6d026bd3ce5f", "id": "de7466b0-985c-4dc3-ad57-17877db45b4c", "type": 2, "last_event_time": "2017-02-14T17:11:10.619Z", "last_event": "4a.800122000a62e4a1"};
-    /* eslint-enable comma-spacing, key-spacing, sort-keys, quotes */
+    /* eslint-enable comma-spacing, key-spacing, sort-keys-fix/sort-keys-fix, quotes */
 
     it('incorporates remote data from backend into local data', () => {
       // prettier-ignore
-      /* eslint-disable comma-spacing, key-spacing, sort-keys, quotes */
+      /* eslint-disable comma-spacing, key-spacing, sort-keys-fix/sort-keys-fix, quotes */
       const local_data = {"archived_state": false, "archived_timestamp": 1487239601118, "cleared_timestamp": 0, "ephemeral_timer": false, "id": "de7466b0-985c-4dc3-ad57-17877db45b4c", "last_event_timestamp": 1488387380633, "last_read_timestamp": 1488387380633, "muted_state": NOTIFICATION_STATE.EVERYTHING, "muted_timestamp": 0, "verification_state": 0};
-      /* eslint-enable comma-spacing, key-spacing, sort-keys, quotes */
+      /* eslint-enable comma-spacing, key-spacing, sort-keys-fix/sort-keys-fix, quotes */
 
       const [merged_conversation] = conversation_mapper.mergeConversation([local_data], [remote_data]);
 
-      expect(merged_conversation.creator).toBe(remote_data.creator);
-      expect(merged_conversation.name).toBe(remote_data.name);
-      expect(merged_conversation.others[0]).toBe(remote_data.members.others[0].id);
-      expect(merged_conversation.status).toBe(remote_data.members.self.status);
-      expect(merged_conversation.team_id).toBe(remote_data.team);
-      expect(merged_conversation.type).toBe(remote_data.type);
+      expect(merged_conversation.creator).withContext('creator').toBe(remote_data.creator);
+      expect(merged_conversation.name).withContext('name').toBe(remote_data.name);
+      expect(merged_conversation.others[0]).withContext('others').toBe(remote_data.members.others[0].id);
+      expect(merged_conversation.status).withContext('status').toBe(remote_data.members.self.status);
+      expect(merged_conversation.team_id).withContext('team_id').toBe(remote_data.team);
+      expect(merged_conversation.type).withContext('type').toBe(remote_data.type);
 
-      expect(merged_conversation.archived_state).toBe(local_data.archived_state);
-      expect(merged_conversation.archived_timestamp).toBe(local_data.archived_timestamp);
-      expect(merged_conversation.cleared_timestamp).toBe(local_data.cleared_timestamp);
-      expect(merged_conversation.ephemeral_timer).toBe(local_data.ephemeral_timer);
-      expect(merged_conversation.id).toBe(local_data.id);
-      expect(merged_conversation.last_event_timestamp).toBe(local_data.last_event_timestamp);
-      expect(merged_conversation.last_read_timestamp).toBe(local_data.last_read_timestamp);
-      expect(merged_conversation.muted_state).toBe(local_data.muted_state);
-      expect(merged_conversation.muted_timestamp).toBe(local_data.muted_timestamp);
-      expect(merged_conversation.verification_state).toBe(local_data.verification_state);
+      expect(merged_conversation.archived_state).withContext('archived_state').toBe(local_data.archived_state);
+      expect(merged_conversation.archived_timestamp)
+        .withContext('archived_timestamp')
+        .toBe(local_data.archived_timestamp);
+      expect(merged_conversation.cleared_timestamp).withContext('cleared_timestamp').toBe(local_data.cleared_timestamp);
+      expect(merged_conversation.ephemeral_timer).withContext('ephemeral_timer').toBe(local_data.ephemeral_timer);
+      expect(merged_conversation.id).withContext('id').toBe(local_data.id);
+      expect(merged_conversation.last_event_timestamp)
+        .withContext('last_event_timestamp')
+        .toBe(local_data.last_event_timestamp);
+      expect(merged_conversation.last_read_timestamp)
+        .withContext('last_read_timestamp')
+        .toBe(local_data.last_read_timestamp);
+      expect(merged_conversation.muted_state).withContext('muted_state').toBe(local_data.muted_state);
+      expect(merged_conversation.muted_timestamp).withContext('muted_timestamp').toBe(local_data.muted_timestamp);
+      expect(merged_conversation.verification_state)
+        .withContext('verification_state')
+        .toBe(local_data.verification_state);
     });
 
     it('should set timestamps on local data if not present', () => {
       // prettier-ignore
-      /* eslint-disable comma-spacing, key-spacing, sort-keys, quotes */
+      /* eslint-disable comma-spacing, key-spacing, sort-keys-fix/sort-keys-fix, quotes */
       const local_data = {"cleared_timestamp": 0, "ephemeral_timer": false, "id": "de7466b0-985c-4dc3-ad57-17877db45b4c", "last_event_timestamp": 1488387380633, "last_read_timestamp": 1488387380633, "verification_state": 0};
-      /* eslint-enable comma-spacing, key-spacing, sort-keys, quotes */
+      /* eslint-enable comma-spacing, key-spacing, sort-keys-fix/sort-keys-fix, quotes */
 
       const remote_data_2 = JSON.parse(JSON.stringify(remote_data));
       remote_data_2.id = createRandomUuid();
@@ -387,32 +397,42 @@ describe('Conversation Mapper', () => {
         [remote_data, remote_data_2],
       );
 
-      expect(merged_conversation.creator).toBe(remote_data.creator);
-      expect(merged_conversation.name).toBe(remote_data.name);
-      expect(merged_conversation.others[0]).toBe(remote_data.members.others[0].id);
-      expect(merged_conversation.status).toBe(remote_data.members.self.status);
-      expect(merged_conversation.type).toBe(remote_data.type);
+      expect(merged_conversation.creator).withContext('creator').toBe(remote_data.creator);
+      expect(merged_conversation.name).withContext('name').toBe(remote_data.name);
+      expect(merged_conversation.others[0]).withContext('others').toBe(remote_data.members.others[0].id);
+      expect(merged_conversation.status).withContext('status').toBe(remote_data.members.self.status);
+      expect(merged_conversation.type).withContext('type').toBe(remote_data.type);
 
-      expect(merged_conversation.cleared_timestamp).toBe(local_data.cleared_timestamp);
-      expect(merged_conversation.ephemeral_timer).toBe(local_data.ephemeral_timer);
-      expect(merged_conversation.id).toBe(local_data.id);
-      expect(merged_conversation.last_event_timestamp).toBe(local_data.last_event_timestamp);
-      expect(merged_conversation.last_read_timestamp).toBe(local_data.last_read_timestamp);
-      expect(merged_conversation.last_server_timestamp).toBe(local_data.last_event_timestamp);
-      expect(merged_conversation.verification_state).toBe(local_data.verification_state);
+      expect(merged_conversation.cleared_timestamp).withContext('cleared_timestamp').toBe(local_data.cleared_timestamp);
+      expect(merged_conversation.ephemeral_timer).withContext('ephemeral_timer').toBe(local_data.ephemeral_timer);
+      expect(merged_conversation.id).withContext('id').toBe(local_data.id);
+      expect(merged_conversation.last_event_timestamp)
+        .withContext('last_event_timestamp')
+        .toBe(local_data.last_event_timestamp);
+      expect(merged_conversation.last_read_timestamp)
+        .withContext('last_read_timestamp')
+        .toBe(local_data.last_read_timestamp);
+      expect(merged_conversation.last_server_timestamp)
+        .withContext('last_server_timestamp')
+        .toBe(local_data.last_event_timestamp);
+      expect(merged_conversation.verification_state)
+        .withContext('verification_state')
+        .toBe(local_data.verification_state);
 
       const expectedArchivedTimestamp = new Date(remote_data.members.self.otr_archived_ref).getTime();
 
-      expect(merged_conversation.archived_timestamp).toBe(expectedArchivedTimestamp);
-      expect(merged_conversation.archived_state).toBe(remote_data.members.self.otr_archived);
+      expect(merged_conversation.archived_timestamp).withContext('archived_timestamp').toBe(expectedArchivedTimestamp);
+      expect(merged_conversation.archived_state)
+        .withContext('archived_state')
+        .toBe(remote_data.members.self.otr_archived);
 
       const expectedNotificationTimestamp = new Date(remote_data.members.self.otr_muted_ref).getTime();
 
-      expect(merged_conversation.muted_state).toBe(false);
-      expect(merged_conversation.muted_timestamp).toBe(expectedNotificationTimestamp);
+      expect(merged_conversation.muted_state).withContext('muted_state').toBe(false);
+      expect(merged_conversation.muted_timestamp).withContext('muted_timestamp').toBe(expectedNotificationTimestamp);
 
-      expect(merged_conversation_2.last_event_timestamp).toBe(2);
-      expect(merged_conversation_2.last_server_timestamp).toBe(2);
+      expect(merged_conversation_2.last_event_timestamp).withContext('last_event_timestamp').toBe(2);
+      expect(merged_conversation_2.last_server_timestamp).withContext('last_server_timestamp').toBe(2);
     });
 
     it('updates local message timer if present on the remote', () => {
@@ -423,13 +443,13 @@ describe('Conversation Mapper', () => {
       const tests = [
         {
           expected: {message_timer: 10000},
-          local: Object.assign({}, baseConversation, {message_timer: undefined}),
-          remote: Object.assign({}, baseConversation, {message_timer: 10000}),
+          local: {...baseConversation, message_timer: undefined},
+          remote: {...baseConversation, message_timer: 10000},
         },
         {
           expected: {message_timer: 0},
-          local: Object.assign({}, baseConversation, {message_timer: 1000}),
-          remote: Object.assign({}, baseConversation, {message_timer: 0}),
+          local: {...baseConversation, message_timer: 1000},
+          remote: {...baseConversation, message_timer: 0},
         },
       ];
 
@@ -442,9 +462,9 @@ describe('Conversation Mapper', () => {
 
     it('updates local archive and muted timestamps if time of remote data is newer', () => {
       // prettier-ignore
-      /* eslint-disable comma-spacing, key-spacing, sort-keys, quotes */
+      /* eslint-disable comma-spacing, key-spacing, sort-keys-fix/sort-keys-fix, quotes */
       const local_data = {"archived_state": false, "archived_timestamp": 1487066801118, "cleared_timestamp": 0, "ephemeral_timer": false, "id": "de7466b0-985c-4dc3-ad57-17877db45b4c", "last_event_timestamp": 1488387380633, "last_read_timestamp": 1488387380633, "muted_state": NOTIFICATION_STATE.EVERYTHING, "muted_timestamp": 0, "verification_state": 0};
-      /* eslint-enable comma-spacing, key-spacing, sort-keys, quotes */
+      /* eslint-enable comma-spacing, key-spacing, sort-keys-fix/sort-keys-fix, quotes */
 
       const self_update = {
         otr_archived: true,
@@ -453,42 +473,50 @@ describe('Conversation Mapper', () => {
         otr_muted_ref: '2017-02-16T10:06:41.118Z',
       };
 
-      remote_data.members.self = Object.assign(remote_data.members.self, self_update);
+      remote_data.members.self = {...remote_data.members.self, ...self_update};
 
       const [merged_conversation] = conversation_mapper.mergeConversation([local_data], [remote_data], true);
 
-      expect(merged_conversation.creator).toBe(remote_data.creator);
-      expect(merged_conversation.name).toBe(remote_data.name);
-      expect(merged_conversation.others[0]).toBe(remote_data.members.others[0].id);
-      expect(merged_conversation.status).toBe(remote_data.members.self.status);
-      expect(merged_conversation.type).toBe(remote_data.type);
+      expect(merged_conversation.creator).withContext('creator').toBe(remote_data.creator);
+      expect(merged_conversation.name).withContext('name').toBe(remote_data.name);
+      expect(merged_conversation.others[0]).withContext('others').toBe(remote_data.members.others[0].id);
+      expect(merged_conversation.status).withContext('status').toBe(remote_data.members.self.status);
+      expect(merged_conversation.type).withContext('type').toBe(remote_data.type);
 
-      expect(merged_conversation.cleared_timestamp).toBe(local_data.cleared_timestamp);
-      expect(merged_conversation.ephemeral_timer).toBe(local_data.ephemeral_timer);
-      expect(merged_conversation.id).toBe(local_data.id);
-      expect(merged_conversation.last_event_timestamp).toBe(local_data.last_event_timestamp);
-      expect(merged_conversation.last_read_timestamp).toBe(local_data.last_read_timestamp);
+      expect(merged_conversation.cleared_timestamp).withContext('cleared_timestamp').toBe(local_data.cleared_timestamp);
+      expect(merged_conversation.ephemeral_timer).withContext('ephemeral_timer').toBe(local_data.ephemeral_timer);
+      expect(merged_conversation.id).withContext('id').toBe(local_data.id);
+      expect(merged_conversation.last_event_timestamp)
+        .withContext('last_event_timestamp')
+        .toBe(local_data.last_event_timestamp);
+      expect(merged_conversation.last_read_timestamp)
+        .withContext('last_read_timestamp')
+        .toBe(local_data.last_read_timestamp);
 
-      expect(merged_conversation.muted_timestamp).not.toBe(local_data.muted_timestamp);
-      expect(merged_conversation.verification_state).toBe(local_data.verification_state);
+      expect(merged_conversation.muted_timestamp).withContext('muted_timestamp').not.toBe(local_data.muted_timestamp);
+      expect(merged_conversation.verification_state)
+        .withContext('verification_state')
+        .toBe(local_data.verification_state);
 
       // remote one is newer
       const expectedArchivedTimestamp = new Date(remote_data.members.self.otr_archived_ref).getTime();
 
-      expect(merged_conversation.archived_timestamp).toBe(expectedArchivedTimestamp);
-      expect(merged_conversation.archived_state).toBe(remote_data.members.self.otr_archived);
+      expect(merged_conversation.archived_timestamp).withContext('archived_timestamp').toBe(expectedArchivedTimestamp);
+      expect(merged_conversation.archived_state)
+        .withContext('archived_state')
+        .toBe(remote_data.members.self.otr_archived);
 
       const expectedNotificationTimestamp = new Date(remote_data.members.self.otr_muted_ref).getTime();
 
-      expect(merged_conversation.muted_state).toBe(true);
-      expect(merged_conversation.muted_timestamp).toBe(expectedNotificationTimestamp);
+      expect(merged_conversation.muted_state).withContext('muted_state').toBe(true);
+      expect(merged_conversation.muted_timestamp).withContext('muted_timestamp').toBe(expectedNotificationTimestamp);
     });
 
     it('only maps other participants if they are still in the conversation', () => {
       // prettier-ignore
-      /* eslint-disable comma-spacing, key-spacing, sort-keys, quotes */
+      /* eslint-disable comma-spacing, key-spacing, sort-keys-fix/sort-keys-fix, quotes */
       const others_update = [{"status": 1, "id": "39b7f597-dfd1-4dff-86f5-fe1b79cb70a0"}, {"status": 0, "id": "5eeba863-44be-43ff-8c47-7565a028f182"}, {"status": 1, "id": "a187fd3e-479a-4e85-a77f-5e4ab95477cf"}, {"status": 0, "id": "d270c7b4-6492-4953-b1bf-be817fe665b2"}];
-      /* eslint-enable comma-spacing, key-spacing, sort-keys, quotes */
+      /* eslint-enable comma-spacing, key-spacing, sort-keys-fix/sort-keys-fix, quotes */
 
       remote_data.members.others = remote_data.members.others.concat(others_update);
 
@@ -499,9 +527,9 @@ describe('Conversation Mapper', () => {
 
     it('updates server timestamp if event timestamp is greater', () => {
       // prettier-ignore
-      /* eslint-disable comma-spacing, key-spacing, sort-keys, quotes */
+      /* eslint-disable comma-spacing, key-spacing, sort-keys-fix/sort-keys-fix, quotes */
       const local_data = {"id": "de7466b0-985c-4dc3-ad57-17877db45b4c", "last_event_timestamp": 1488387380633, "last_read_timestamp": 1488387380633, "last_server_timestamp": 1377276270510,"muted_state": false, "muted_timestamp": 0, "verification_state": 0};
-      /* eslint-enable comma-spacing, key-spacing, sort-keys, quotes */
+      /* eslint-enable comma-spacing, key-spacing, sort-keys-fix/sort-keys-fix, quotes */
 
       const [merged_conversation] = conversation_mapper.mergeConversation([local_data], [remote_data]);
 
@@ -523,7 +551,7 @@ describe('Conversation Mapper', () => {
 
       const [mergedConversation] = conversation_mapper.mergeConversation([localData], [remoteData]);
 
-      expect(mergedConversation.receipt_mode).toBe(remoteReceiptMode);
+      expect(mergedConversation.receipt_mode).withContext('receipt_mode').toBe(remoteReceiptMode);
     });
   });
 

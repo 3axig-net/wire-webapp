@@ -17,11 +17,11 @@
  *
  */
 
+import {ConnectionStatus} from '@wireapp/api-client/src/connection';
 import {instantiateComponent} from '../../../helper/knockoutHelpers';
 
 import {User} from 'src/script/entity/User';
 import {Conversation} from 'src/script/entity/Conversation';
-import {ConnectionStatus} from 'src/script/connection/ConnectionStatus';
 
 import 'src/script/components/icons';
 import 'src/script/components/panel/userActions';
@@ -33,7 +33,7 @@ describe('user-actions', () => {
         expected: ['go-profile', 'do-leave'],
         getParams: () => {
           const user = new User();
-          user.is_me = true;
+          user.isMe = true;
 
           const conversation = new Conversation();
           conversation.isGroup = () => true;
@@ -51,7 +51,7 @@ describe('user-actions', () => {
         expected: ['go-profile'],
         getParams: () => {
           const user = new User();
-          user.is_me = true;
+          user.isMe = true;
           const conversation = new Conversation();
           return {conversation: () => conversation, isSelfActivated: false, user: () => user};
         },

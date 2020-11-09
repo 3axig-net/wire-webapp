@@ -18,7 +18,7 @@
  */
 
 import {Article, LinkPreview, Tweet} from '@wireapp/protocol-messaging';
-import {Data as OpenGraphData} from 'open-graph';
+import type {Data as OpenGraphData} from 'open-graph';
 import {isEmpty} from 'underscore';
 
 import {deArrayify} from 'Util/ArrayUtil';
@@ -41,7 +41,7 @@ export const buildFromOpenGraphData = (data: OpenGraphData, link: string, offset
     return;
   }
 
-  data.url = data.url || link;
+  data.url ||= link;
 
   if (!data.title || !data.url) {
     return;
@@ -49,8 +49,8 @@ export const buildFromOpenGraphData = (data: OpenGraphData, link: string, offset
 
   const {description = '', site_name, title = '', url: dataUrl} = data;
 
-  const truncatedDescription = truncate(deArrayify(description), Config.MAXIMUM_LINK_PREVIEW_CHARS);
-  const truncatedTitle = truncate(deArrayify(title), Config.MAXIMUM_LINK_PREVIEW_CHARS);
+  const truncatedDescription = truncate(deArrayify(description), Config.getConfig().MAXIMUM_LINK_PREVIEW_CHARS);
+  const truncatedTitle = truncate(deArrayify(title), Config.getConfig().MAXIMUM_LINK_PREVIEW_CHARS);
 
   const protoArticle = new Article({
     permanentUrl: deArrayify(dataUrl),
@@ -68,9 +68,7 @@ export const buildFromOpenGraphData = (data: OpenGraphData, link: string, offset
   });
 
   if (deArrayify(site_name) === 'Twitter' && isTweetUrl(deArrayify(dataUrl))) {
-    const author = deArrayify(title)
-      .replace('on Twitter', '')
-      .trim();
+    const author = deArrayify(title).replace('on Twitter', '').trim();
     const username = deArrayify(dataUrl).match(/com\/([^/]*)\//)[1];
     const protoTweet = new Tweet({author, username});
 

@@ -18,8 +18,7 @@
  */
 
 import {ValidationUtil} from '@wireapp/commons';
-import * as UUID from 'uuid/v4';
-
+import {createRandomUuid} from 'Util/util';
 const env = window.wire.env;
 
 export const ACCENT_ID = {
@@ -35,10 +34,12 @@ export const ACCENT_ID = {
 export class Configuration {
   readonly APP_BASE = env.APP_BASE || 'https://app.wire.com';
   readonly APP_NAME = env.APP_NAME || 'Webapp';
-  readonly APP_INSTANCE_ID = UUID();
+  readonly APP_INSTANCE_ID = createRandomUuid();
+  readonly BACKEND_NAME = env.BACKEND_NAME || 'Wire';
   readonly BACKEND_REST = env.BACKEND_REST || 'https://prod-nginz-https.wire.com';
   readonly BACKEND_WS = env.BACKEND_WS || 'wss://prod-nginz-ssl.wire.com';
   readonly BRAND_NAME = env.BRAND_NAME || 'Wire';
+  readonly COUNTLY_API_KEY = env.COUNTLY_API_KEY;
   readonly ENVIRONMENT = env.ENVIRONMENT || 'production';
   readonly FEATURE = env.FEATURE;
   readonly MAX_GROUP_PARTICIPANTS = env.MAX_GROUP_PARTICIPANTS || 500;
@@ -47,62 +48,74 @@ export class Configuration {
   readonly URL = env.URL || {
     ACCOUNT_BASE: 'https://account.wire.com',
     MOBILE_BASE: '',
-    SUPPORT_BASE: 'https://support.wire.com',
+    PRIVACY_POLICY: 'https://wire-website-staging.zinfra.io/security',
+    SUPPORT: {
+      BUG_REPORT: 'https://support.wire.com/new?ticket_form_id=101615',
+      CALLING: 'https://support.wire.com/hc/articles/202969412',
+      CAMERA_ACCESS_DENIED: 'https://support.wire.com/hc/articles/202935412',
+      CONTACT: 'https://support.wire.com/new',
+      DEVICE_ACCESS_DENIED: 'https://support.wire.com/hc/articles/213512545',
+      DEVICE_NOT_FOUND: 'https://support.wire.com/hc/articles/202970662',
+      EMAIL_EXISTS: 'https://support.wire.com/hc/articles/115004082129',
+      HISTORY: 'https://support.wire.com/hc/articles/207834645',
+      INDEX: 'https://support.wire.com/',
+      MICROPHONE_ACCESS_DENIED: 'https://support.wire.com/hc/articles/202590081',
+      SCREEN_ACCESS_DENIED: 'https://support.wire.com/hc/articles/202935412',
+    },
     TEAMS_BASE: 'https://teams.wire.com',
+    TEAMS_CREATE: 'https://wire.com/create-team/?pk_campaign=client&pk_kwd=desktop',
+    TERMS_OF_USE_PERSONAL: 'https://wire-website-staging.zinfra.io/legal/terms/personal',
+    TERMS_OF_USE_TEAMS: 'https://wire-website-staging.zinfra.io/legal/terms/teams',
     WEBSITE_BASE: 'https://wire.com',
+    WHATS_NEW: 'https://medium.com/wire-news/webapp-updates/home',
   };
   readonly VERSION = env.VERSION || '0.0.0';
+  readonly WEBSITE_LABEL = env.WEBSITE_LABEL;
 
-  // 10 seconds until phone code expires
-  readonly LOGIN_CODE_EXPIRATION = 10 * 60;
-
-  // 25 megabyte upload limit for personal use (private users & guests)
+  /** 25 megabyte upload limit for personal use (private users & guests) */
   readonly MAXIMUM_ASSET_FILE_SIZE_PERSONAL = 25 * 1024 * 1024;
 
-  // 100 megabyte upload limit for organizations (team members)
+  /** 100 megabyte upload limit for organizations (team members) */
   readonly MAXIMUM_ASSET_FILE_SIZE_TEAM = 100 * 1024 * 1024;
 
-  // 15 megabyte image upload limit
+  /** 15 megabyte image upload limit */
   readonly MAXIMUM_IMAGE_FILE_SIZE = 15 * 1024 * 1024;
 
-  // maximum chars for link preview titles and descriptions
+  /** maximum chars for link preview titles and descriptions */
   readonly MAXIMUM_LINK_PREVIEW_CHARS = 200;
 
-  // Maximum characters per sent message
+  /** Maximum characters per sent message */
   readonly MAXIMUM_MESSAGE_LENGTH = 8000;
 
-  // Maximum characters per received message
-  // Encryption is approx. +40% of the original payload so let's round it at +50%
+  /**
+   * Maximum characters per received message
+   * Encryption is approx. +40% of the original payload so let's round it at +50%
+   */
   readonly MAXIMUM_MESSAGE_LENGTH_RECEIVING = 12000 * 1.5;
 
-  // bigger requests will be split in chunks with a maximum size as defined
+  /** bigger requests will be split in chunks with a maximum size as defined */
   readonly MAXIMUM_USERS_PER_REQUEST = 200;
 
-  // number of messages that will be pulled
+  /** number of messages that will be pulled */
   readonly MESSAGES_FETCH_LIMIT = 30;
 
   readonly MINIMUM_PASSWORD_LENGTH = 8;
 
-  // measured in pixel
+  /** measured in pixel */
   readonly SCROLL_TO_LAST_MESSAGE_THRESHOLD = 100;
 
-  readonly SUPPORT = {
-    FORM: {
-      BUG: 'new?ticket_form_id=101615',
-      CONTACT: 'new',
-    },
-    ID: {
-      CALLING: 202969412,
-      CAMERA_ACCESS_DENIED: 202935412,
-      DEVICE_ACCESS_DENIED: 213512545,
-      DEVICE_NOT_FOUND: 202970662,
-      HISTORY: 207834645,
-      MICROPHONE_ACCESS_DENIED: 202590081,
-      SCREEN_ACCESS_DENIED: 202935412,
-    },
-  };
+  readonly ALLOWED_IMAGE_TYPES = ['image/bmp', 'image/gif', 'image/jpeg', 'image/jpg', 'image/png', '.jpg-large'];
 }
 
-const Config = new Configuration();
+let instance: Configuration;
+
+const Config = {
+  getConfig: () => {
+    if (!instance) {
+      instance = new Configuration();
+    }
+    return instance;
+  },
+};
 
 export {Config};

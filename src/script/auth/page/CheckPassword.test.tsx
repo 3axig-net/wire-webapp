@@ -23,22 +23,43 @@ import React from 'react';
 import waitForExpect from 'wait-for-expect';
 import {actionRoot} from '../module/action';
 import {BackendError} from '../module/action/BackendError';
-import {initialRootState} from '../module/reducer';
+import {initialRootState, RootState, Api} from '../module/reducer';
 import {ROUTE} from '../route';
 import {mockStoreFactory} from '../util/test/mockStoreFactory';
 import {mountComponent} from '../util/test/TestUtil';
 import CheckPassword from './CheckPassword';
+import {MockStoreEnhanced} from 'redux-mock-store';
+import {TypeUtil} from '@wireapp/commons';
+import {ThunkDispatch} from 'redux-thunk';
+import {AnyAction} from 'redux';
+import {History} from 'history';
+import {StatusCodes as HTTP_STATUS} from 'http-status-codes';
 
-describe('"CheckPassword"', () => {
-  let wrapper: ReactWrapper;
+class CheckPasswordPage {
+  private readonly driver: ReactWrapper;
 
-  const passwordInput = () => wrapper.find('input[data-uie-name="enter-password"]').first();
-  const loginButton = () => wrapper.find('button[data-uie-name="do-sign-in"]').first();
-  const errorMessage = () => wrapper.find('[data-uie-name="error-message"]').first();
+  constructor(
+    store: MockStoreEnhanced<TypeUtil.RecursivePartial<RootState>, ThunkDispatch<RootState, Api, AnyAction>>,
+    history?: History<any>,
+  ) {
+    this.driver = mountComponent(<CheckPassword />, store, history);
+  }
 
+  getPasswordInput = () => this.driver.find('input[data-uie-name="enter-password"]');
+  getLoginButton = () => this.driver.find('button[data-uie-name="do-sign-in"]');
+  getErrorMessage = (errorLabel?: string) =>
+    this.driver.find(`[data-uie-name="error-message"]${errorLabel ? `[data-uie-value="${errorLabel}"]` : ''}`);
+
+  clickLoginButton = () => this.getLoginButton().simulate('click');
+
+  enterPassword = (value: string) => this.getPasswordInput().simulate('change', {target: {value}});
+
+  update = () => this.driver.update();
+}
+
+describe('CheckPassword', () => {
   it('has disabled submit button as long as there is no input', () => {
-    wrapper = mountComponent(
-      <CheckPassword />,
+    const checkPasswordPage = new CheckPasswordPage(
       mockStoreFactory()({
         ...initialRootState,
         runtimeState: {
@@ -49,19 +70,15 @@ describe('"CheckPassword"', () => {
       }),
     );
 
-    expect(passwordInput().exists())
-      .withContext('password input is present')
-      .toBe(true);
-    expect(loginButton().exists())
-      .withContext('submit button is present')
-      .toBe(true);
+    expect(checkPasswordPage.getPasswordInput().exists()).withContext('password input is present').toBe(true);
 
-    expect(loginButton().props().disabled)
-      .withContext('submit button is disabled')
-      .toBe(true);
+    expect(checkPasswordPage.getLoginButton().exists()).withContext('submit button is present').toBe(true);
 
-    passwordInput().simulate('change', {target: {value: 'e'}});
-    expect(loginButton().props().disabled)
+    expect(checkPasswordPage.getLoginButton().props().disabled).withContext('submit button is disabled').toBe(true);
+
+    checkPasswordPage.enterPassword('e');
+
+    expect(checkPasswordPage.getLoginButton().props().disabled)
       .withContext('submit button should be enabled')
       .toBe(false);
   });
@@ -72,8 +89,7 @@ describe('"CheckPassword"', () => {
 
     spyOn(actionRoot.authAction, 'doLogin').and.returnValue(() => Promise.resolve());
 
-    wrapper = mountComponent(
-      <CheckPassword />,
+    const checkPasswordPage = new CheckPasswordPage(
       mockStoreFactory()({
         ...initialRootState,
         runtimeState: {
@@ -85,17 +101,17 @@ describe('"CheckPassword"', () => {
       history,
     );
 
-    passwordInput().simulate('change', {target: {value: 'e'}});
-    expect(loginButton().props().disabled)
+    checkPasswordPage.enterPassword('e');
+
+    expect(checkPasswordPage.getLoginButton().props().disabled)
       .withContext('submit button should be enabled')
       .toBe(false);
 
-    loginButton().simulate('click');
+    checkPasswordPage.clickLoginButton();
 
     await waitForExpect(() => {
-      expect(actionRoot.authAction.doLogin)
-        .withContext('action was called')
-        .toHaveBeenCalled();
+      expect(actionRoot.authAction.doLogin).withContext('action was called').toHaveBeenCalled();
+
       expect(historyPushSpy)
         .withContext('navigation to history page was triggered')
         .toHaveBeenCalledWith(ROUTE.HISTORY_INFO as any);
@@ -103,11 +119,10 @@ describe('"CheckPassword"', () => {
   });
 
   it('handles invalid credentials', async () => {
-    const error = new BackendError({code: 404, label: BackendError.LABEL.INVALID_CREDENTIALS});
+    const error = new BackendError({code: HTTP_STATUS.NOT_FOUND, label: BackendError.LABEL.INVALID_CREDENTIALS});
     spyOn(actionRoot.authAction, 'doLogin').and.returnValue(() => Promise.reject(error));
 
-    wrapper = mountComponent(
-      <CheckPassword />,
+    const checkPasswordPage = new CheckPasswordPage(
       mockStoreFactory()({
         ...initialRootState,
         runtimeState: {
@@ -118,20 +133,23 @@ describe('"CheckPassword"', () => {
       }),
     );
 
-    passwordInput().simulate('change', {target: {value: 'e'}});
-    expect(loginButton().props().disabled)
+    checkPasswordPage.enterPassword('e');
+
+    expect(checkPasswordPage.getLoginButton().props().disabled)
       .withContext('submit button should be enabled')
       .toBe(false);
 
-    loginButton().simulate('click');
+    checkPasswordPage.clickLoginButton();
 
     await waitForExpect(() => {
-      expect(actionRoot.authAction.doLogin)
-        .withContext('action was called')
-        .toHaveBeenCalled();
-      expect(errorMessage().text())
+      expect(actionRoot.authAction.doLogin).withContext('action was called').toHaveBeenCalledTimes(1);
+    });
+    await waitForExpect(() => {
+      checkPasswordPage.update();
+
+      expect(checkPasswordPage.getErrorMessage(BackendError.LABEL.INVALID_CREDENTIALS).exists())
         .withContext('Shows invalid credentials error')
-        .toEqual('Please verify your details and try again');
+        .toBe(true);
     });
   });
 
@@ -139,11 +157,10 @@ describe('"CheckPassword"', () => {
     const history = createMemoryHistory();
     const historyPushSpy = spyOn(history, 'push');
 
-    const error = new BackendError({code: 404, label: BackendError.LABEL.TOO_MANY_CLIENTS});
+    const error = new BackendError({code: HTTP_STATUS.NOT_FOUND, label: BackendError.LABEL.TOO_MANY_CLIENTS});
     spyOn(actionRoot.authAction, 'doLogin').and.returnValue(() => Promise.reject(error));
 
-    wrapper = mountComponent(
-      <CheckPassword />,
+    const checkPasswordPage = new CheckPasswordPage(
       mockStoreFactory()({
         ...initialRootState,
         runtimeState: {
@@ -155,17 +172,17 @@ describe('"CheckPassword"', () => {
       history,
     );
 
-    passwordInput().simulate('change', {target: {value: 'e'}});
-    expect(loginButton().props().disabled)
+    checkPasswordPage.enterPassword('e');
+
+    expect(checkPasswordPage.getLoginButton().props().disabled)
       .withContext('submit button should be enabled')
       .toBe(false);
 
-    loginButton().simulate('click');
+    checkPasswordPage.clickLoginButton();
 
     await waitForExpect(() => {
-      expect(actionRoot.authAction.doLogin)
-        .withContext('action was called')
-        .toHaveBeenCalled();
+      expect(actionRoot.authAction.doLogin).withContext('action was called').toHaveBeenCalled();
+
       expect(historyPushSpy)
         .withContext('navigation to too many clients page was triggered')
         .toHaveBeenCalledWith(ROUTE.CLIENTS as any);

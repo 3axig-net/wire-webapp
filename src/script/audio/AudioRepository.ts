@@ -17,17 +17,24 @@
  *
  */
 
-import {WebappProperties} from '@wireapp/api-client/dist/user/data';
+import {AudioPreference, WebappProperties} from '@wireapp/api-client/src/user/data';
+import {WebAppEvents} from '@wireapp/webapp-events';
 import {amplify} from 'amplify';
 import ko from 'knockout';
-import {Logger} from 'logdown';
-import {getLogger} from 'Util/Logger';
+
+import {Logger, getLogger} from 'Util/Logger';
 
 import {NOTIFICATION_HANDLING_STATE} from '../event/NotificationHandlingState';
-import {WebAppEvents} from '../event/WebApp';
 import {AudioPlayingType} from './AudioPlayingType';
-import {AudioPreference} from './AudioPreference';
 import {AudioType} from './AudioType';
+
+declare global {
+  interface Navigator {
+    mediaSession: {
+      setActionHandler: Function;
+    };
+  }
+}
 
 enum AUDIO_PLAY_PERMISSION {
   ALLOWED = 0,
@@ -88,7 +95,7 @@ export class AudioRepository {
 
   private initSounds(preload: boolean): void {
     Object.values(AudioType).forEach(audioId => {
-      this.audioElements[audioId] = this.createAudioElement(`/audio/${audioId}.mp3`, preload);
+      this.audioElements[audioId] = this.createAudioElement(`./audio/${audioId}.mp3`, preload);
     });
 
     this.logger.info(`Sounds initialized (preload: '${preload}')`);
@@ -107,6 +114,12 @@ export class AudioRepository {
     amplify.subscribe(WebAppEvents.EVENT.NOTIFICATION_HANDLING_STATE, this.setMutedState.bind(this));
     amplify.subscribe(WebAppEvents.PROPERTIES.UPDATED, this.updatedProperties.bind(this));
     amplify.subscribe(WebAppEvents.PROPERTIES.UPDATE.SOUND_ALERTS, this.setAudioPreference.bind(this));
+
+    if ('mediaSession' in navigator) {
+      const noop = () => {};
+      navigator.mediaSession.setActionHandler('play', noop);
+      navigator.mediaSession.setActionHandler('pause', noop);
+    }
   }
 
   init(preload: boolean = false): void {
@@ -118,10 +131,10 @@ export class AudioRepository {
     return this.play(audioId, true);
   }
 
-  private playAudio(audioElement: HTMLAudioElement, playInLoop: boolean = false): Promise<void> {
+  private async playAudio(audioElement: HTMLAudioElement, playInLoop: boolean = false): Promise<void> {
     if (!audioElement.paused) {
       // element already playing, nothing to do
-      return Promise.resolve();
+      return;
     }
 
     audioElement.loop = playInLoop;
@@ -130,30 +143,25 @@ export class AudioRepository {
       audioElement.currentTime = 0;
     }
 
-    const playPromise = audioElement.play();
-
-    return playPromise || Promise.resolve();
+    return audioElement.play();
   }
 
-  play(audioId: AudioType, playInLoop: boolean = false): Promise<void> {
+  async play(audioId: AudioType, playInLoop: boolean = false): Promise<void> {
     const audioElement = this.getSoundById(audioId);
     if (!audioElement) {
       this.logger.error(`Failed to play '${audioId}': sound not found`);
-      return Promise.resolve();
+      return;
     }
 
     switch (this.canPlaySound(audioId)) {
       case AUDIO_PLAY_PERMISSION.ALLOWED:
-        return this.playAudio(audioElement, playInLoop)
-          .then(() => {
-            this.logger.info(`Playing sound '${audioId}' (loop: '${playInLoop}')`);
-          })
-          .catch(error => {
-            if (error) {
-              this.logger.error(`Failed to play sound '${audioId}': ${error.message}`);
-              throw error;
-            }
-          });
+        try {
+          await this.playAudio(audioElement, playInLoop);
+          this.logger.info(`Playing sound '${audioId}' (loop: '${playInLoop}')`);
+        } catch (error) {
+          this.logger.error(`Failed to play sound '${audioId}': ${error.message}`);
+          throw error;
+        }
 
       case AUDIO_PLAY_PERMISSION.DISALLOWED_BY_MUTE_STATE:
         this.logger.debug(`Playing '${audioId}' was disallowed by mute state`);
@@ -163,7 +171,6 @@ export class AudioRepository {
         this.logger.debug(`Playing '${audioId}' was disallowed because of user's preferences`);
         break;
     }
-    return Promise.resolve();
   }
 
   setAudioPreference(audioPreference: AudioPreference): void {

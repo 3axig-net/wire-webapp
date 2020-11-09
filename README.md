@@ -22,52 +22,44 @@ No license is granted to the Wire trademark and its associated logos, all of whi
 
 ### Installation
 
-1.  Install [Node.js](https://nodejs.org/)
-1.  Install [Yarn](https://yarnpkg.com): `npm install -g yarn`
-1.  Run `yarn`
-1.  Rename `.env.localhost` to `.env` in order to run the app in a local environment
+1. Install [Node.js](https://nodejs.org/)
+1. Install [Yarn](https://yarnpkg.com)
+1. Run `yarn`
+1. Rename `.env.localhost` to `.env` in order to run the app in a local environment
+1. Use a browser with disabled web security (`−−disable−web−security` in Chrome) to circumvent CORS issues when connecting to our backend from localhost
 
 ### Execution
 
-Run `yarn start` and Wire's web app will be available at: http://localhost:8080/auth/#login
-
-To login with your existing Wire account use: http://localhost:8080/auth/?env=prod#login
+Run `yarn start` and Wire's web app will be available at: https://localhost:8081/auth/
 
 ### Testing
 
-To launch the full test suite (types check + linting + server tests + app tests), simply run
+To launch the full test suite (types check + linting + server tests + app tests), simply run:
 
 `yarn test`
 
-Alternatively, you can run specific parts of the app:
+Alternatively, you can test specific parts of the app:
 
-`yarn test:(server|types|auth|app)`
+`yarn test:(server|types|app)`
 
-Since the test suite for the app is the biggest test suite, you might want to run a single test file, in which case, you can use the `--specs` option:
+### Development
 
-`yarn test:app --specs spec1[,spec2...]`
+Bypass Chrome's security restrictions for local development:
 
-where `specN` is the path to the spec to run relative to `test/unit_tests` and without `Spec.js`.
+1. Add the following entries to your hosts file: `127.0.0.1 local.wire.com` (to connect with production backend) and `127.0.0.1 local.zinfra.io` (to connect with staging backend)
+1. Restart your Chrome browser with flags: `--disable-web-security --ignore-certificate-errors --user-data-dir=...`
+1. Run `yarn start`
 
-#### Speed up testing for files fully migrated to the module system
+Host file location:
 
-When a file (and all its dependencies) does not rely on **any** global dependency (i.e. `window.z.util`), then you can use the `--nolegacy` flag to run the tests on that single file:
+- On macOS / Linux the hosts file can be found at: `/etc/hosts`
+- On Windows 10 the hosts file can be found at: `%WINDIR%\system32\drivers\etc\hosts`
 
-`yarn test:app --specs spec1 --nolegacy`
+Optional: If your browser does not trust the certificate from "local.wire.com" or "local.zinfra.io":
 
-The test should start very quickly (webpack won't have to resolve all the global dependencies).
-
-If the test doesn't run with the `nolegacy` option (but runs without), it means it's depending on at least one dependency from the global `window` namespace.
-
-**Example**
-
-If you want to run the tests for the `ConversationRepository`, the file containing the test is:
-
-`test/unit_tests/conversation/ConversationRepositorySpec.js`
-
-The command to run is:
-
-`yarn test:app --specs conversation/ConversationRepository`
+1. Download [mkcert](https://github.com/FiloSottile/mkcert/releases/latest)
+1. Set `CAROOT` env variable to `./server/certificate`
+1. Run `mkcert -install`
 
 ### Deployment
 
@@ -75,22 +67,23 @@ The command to run is:
 
 | Stage | Branch | Action | Environment | Backend |
 | :-: | :-: | :-: | :-: | :-- |
-| 1 (Feature development) | edge | commit | wire-webapp-edge | Staging |
-| 2 (Nightly test automation) | dev | commit or squash merge from edge | wire-webapp-dev | Staging |
-| 3 (Internal release) | dev | tag (format: YYYY-MM-DD-staging.X) | wire-webapp-staging | Production |
-| 4 (RC testing) | master | merge (don't squash) from "dev"; afterwards [generate release notes](#release-notes) | wire-webapp-master | Staging |
-| 5 (Production release) | master | tag (format: YYYY-MM-DD-production.X) | wire-webapp-prod | Production |
+| 1 (Feature development) | edge | commit | [wire-webapp-edge](https://wire-webapp-edge.zinfra.io/) | Staging |
+| 2 (Nightly test automation) | dev | commit or squash merge from edge | [wire-webapp-dev](https://wire-webapp-dev.zinfra.io/) | Staging |
+| 3 (Internal release) | dev | tag (format: YYYY-MM-DD-staging.X) | [wire-webapp-staging](https://wire-webapp-staging.wire.com/) | Production |
+| 4 (RC testing) | master | merge (don't squash) from "dev"; afterwards [generate release notes](#release-notes) | [wire-webapp-master](https://wire-webapp-master.zinfra.io/) | Staging |
+| 5 (Production release) | master | tag (format: YYYY-MM-DD-production.X) | [wire-webapp-prod](https://app.wire.com/) | Production |
 
 #### Staging Bumps for internal releases
 
 **Actions**
 
 1. Get commit ID which has been approved by QA team
-1. run `yarn release:staging <commitId>`.
+1. run `yarn release:staging <commitId>` (if the commit ID is omitted, the latest commit from `dev` will be used).
 1. Example:
    ```
    yarn release:staging 90fda951916f0d60a5bffce69a7267830e313391
    ```
+1. Enter "yes"
 
 If everything is done right, you will see a Travis CI job in the [build pipeline](https://travis-ci.org/wireapp/wire-webapp/builds) based on the new tag:
 
@@ -102,7 +95,7 @@ Before RC testing we create a merge commit (**don't squash!**) from "dev" to "ma
 
 #### Production Release
 
-Similar to "Staging Bumps" with the exception that you need to run `yarn release:production <commitId>`.
+Similar to "Staging Bumps" with the exception that you need to run `yarn release:production <commitId>` (if the commit ID is omitted, the latest commit from `master` will be used).
 
 Example:
 
@@ -112,11 +105,11 @@ yarn release:production 90fda951916f0d60a5bffce69a7267830e313391
 
 ##### Release notes
 
-Release notes need to be generated with `yarn changelog` after merging to "master" and before creating the new production release tag. Release notes will be locally available (not committed to the repository) in [./CHANGELOG.md](./CHANGELOG.md) and sent to our marketing team to create release notes on [Medium](https://medium.com/wire-news/desktop-updates/home).
+Release notes need to be generated with `yarn changelog` after merging to "master" and before creating the new production release tag. Release notes will be locally available (not committed to the repository) in [CHANGELOG.md](./CHANGELOG.md) and sent to our marketing team to create release notes on [Medium](https://medium.com/wire-news/desktop-updates/home).
 
 #### Manual Deployments
 
-Based on the Git branch, builds get deployed automatically by [Travis CI](https://travis-ci.org/). In case Travis CI is not working, a manual deployment can be triggered using `yarn deploy`.
+Based on the git branch, builds get deployed automatically by [Travis CI](https://travis-ci.org/). In case Travis CI is not working, a manual deployment can be triggered using `yarn deploy`.
 
 A manual deployment requires the local setup of the Elastic Beanstalk Command Line Interface ([EB CLI](https://docs.aws.amazon.com/en_us/elasticbeanstalk/latest/dg/eb-cli3.html)). Manual deployments are also based on branch defaults which are configured [here](./.elasticbeanstalk/config.yml).
 
@@ -127,3 +120,42 @@ A manual deployment requires the local setup of the Elastic Beanstalk Command Li
 ### Translations
 
 All Wire translations are crowdsourced via [Crowdin](https://crowdin.com/projects/wire).
+
+#### Add new strings
+
+**Info:**
+
+- To download translations we use Crowdin API v1, and you need to setup your [username](https://crowdin.com/settings#account) and [api_key](https://crowdin.com/settings#api-key) (Account API key).
+- To upload translations we use Crowdin CLI v3, and you will need to setup [project_identifier](https://crowdin.com/project/wire-webapp/settings#api) and [api_token](https://crowdin.com/settings#api-key) (Personal Access Token).
+
+**Setup:**
+
+Create a `keys/crowdin.yaml` in this repository and add the following entries:
+
+```yaml
+api_key: your-account-api-key
+api_token: your-personal-access-token
+project_identifier: wire-webapp
+username: your-username
+```
+
+**Usage:**
+
+1. Install [Crowdin CLI v3](https://support.crowdin.com/cli-tool/)
+1. Verify you have a `keys/crowdin.yaml` in place
+1. Run `yarn translate:download`
+1. Add string variable and text to "i18n/en-US.json"
+1. Run `yarn translate:upload`
+1. Verify your string shows up on [Crowdin project: wire-webapp](https://crowdin.com/translate/wire-webapp/1224/en-en)
+1. Add translation on Crowdin
+1. Approve translation on Crowdin
+1. Run `yarn translate:download`
+
+### Contributing
+
+Contributions are welcome! Feel free to check our [issues page](https://github.com/wireapp/wire-webapp/issues).
+
+The following commits will help you getting started quickly with our code base:
+
+- [Show a modal / pop-up](https://github.com/wireapp/wire-webapp/commit/00d3d120aacb3f36da80edd1ca829afc045331e9)
+- [Sync setting between via backend](https://github.com/wireapp/wire-webapp/commit/3e4595a208189b7b6b51935fd2c41a74bbd16994)

@@ -18,14 +18,15 @@
  */
 
 import {APIClient} from '@wireapp/api-client';
+
 import {Config} from '../Config';
 
 const configureClient = () => {
   return new APIClient({
     urls: {
-      name: Config.ENVIRONMENT,
-      rest: Config.BACKEND_REST,
-      ws: Config.BACKEND_WS,
+      name: Config.getConfig().ENVIRONMENT,
+      rest: Config.getConfig().BACKEND_REST,
+      ws: Config.getConfig().BACKEND_WS,
     },
   });
 };

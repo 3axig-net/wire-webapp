@@ -18,16 +18,16 @@
  */
 
 import {amplify} from 'amplify';
+import {WebAppEvents} from '@wireapp/webapp-events';
+import {USER_EVENT} from '@wireapp/api-client/src/event';
 import ko from 'knockout';
 
 import {t} from 'Util/LocalizerUtil';
 import {Logger, getLogger} from 'Util/Logger';
 import {createRandomUuid} from 'Util/util';
 
-import {Conversation} from '../entity/Conversation';
-import {BackendEvent} from '../event/Backend';
-import {WebAppEvents} from '../event/WebApp';
-import {PropertiesService} from '../properties/PropertiesService';
+import type {Conversation} from '../entity/Conversation';
+import type {PropertiesService} from '../properties/PropertiesService';
 import {ModalsViewModel} from '../view_model/ModalsViewModel';
 
 export enum LabelType {
@@ -36,15 +36,15 @@ export enum LabelType {
 }
 
 export enum DefaultLabelIds {
-  Groups = 'groups',
   Contacts = 'contacts',
   Favorites = 'favorites',
+  Groups = 'groups',
 }
 
 export interface ConversationLabel {
+  conversations: ko.ObservableArray<Conversation>;
   id: string;
   name: string;
-  conversations: ko.ObservableArray<Conversation>;
   type: LabelType;
 }
 
@@ -143,7 +143,7 @@ export class ConversationLabelRepository {
   };
 
   onUserEvent = (event: any) => {
-    if (event.type === BackendEvent.USER.PROPERTIES_SET && event.key === propertiesKey) {
+    if (event.type === USER_EVENT.PROPERTIES_SET && event.key === propertiesKey) {
       this.unmarshal(event.value);
     }
   };

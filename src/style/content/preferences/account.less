@@ -41,6 +41,16 @@
 
   edit-icon {
     opacity: 0;
+
+    svg path {
+      fill: currentColor;
+    }
+  }
+
+  animated-check-icon {
+    svg path {
+      stroke: currentColor;
+    }
   }
 }
 
@@ -125,7 +135,7 @@
 }
 
 .preferences-account-accent-color {
-  width: 100%;
+  width: 256px;
 }
 
 .preferences-account-mail,
@@ -160,10 +170,6 @@
     }
   }
 
-  > participant-avatar {
-    pointer-events: none;
-  }
-
   > input {
     position: absolute;
     left: @offscreen-left;
@@ -180,6 +186,11 @@
 .preferences-account-name-wrapper {
   position: relative;
   width: 256px;
+}
+
+.preferences-account-email-wrapper {
+  position: relative;
+  width: 330px;
 }
 
 .preferences-account-username-wrapper {

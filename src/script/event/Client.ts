@@ -23,8 +23,11 @@ export enum CALL {
 
 export enum CONVERSATION {
   ASSET_ADD = 'conversation.asset-add',
+  BUTTON_ACTION_CONFIRMATION = 'conversation.button-action-confirmation',
+  COMPOSITE_MESSAGE_ADD = 'conversation.composite-message-add',
   CONFIRMATION = 'conversation.confirmation',
   DELETE_EVERYWHERE = 'conversation.delete-everywhere',
+  FILE_TYPE_RESTRICTED = 'conversation.file-type-restricted',
   GROUP_CREATION = 'conversation.group-creation',
   INCOMING_MESSAGE_TOO_BIG = 'conversation.incoming-message-too-big',
   KNOCK = 'conversation.knock',
@@ -45,6 +48,7 @@ export enum CONVERSATION {
 
 export enum USER {
   AVAILABILITY = 'user.availability',
+  DATA_TRANSFER = 'user.data-transfer',
 }
 
 export const ClientEvent = {

@@ -17,34 +17,13 @@
  *
  */
 
+import {CONVERSATION_TYPE} from '@wireapp/api-client/src/conversation';
 import {noop} from 'Util/util';
 
 import {ConversationDetailsViewModel} from 'src/script/view_model/panel/ConversationDetailsViewModel';
 import {Conversation} from 'src/script/entity/Conversation';
-import {ConversationType} from 'src/script/conversation/ConversationType';
 
 describe('ConversationDetailsViewModel', () => {
-  const testFactory = new window.TestFactory();
-  let conversationDetailsViewModel;
-
-  beforeEach(() => {
-    return testFactory.exposeConversationActors().then(conversationRepository => {
-      conversationDetailsViewModel = new ConversationDetailsViewModel({
-        isVisible: noop,
-        mainViewModel: {},
-        navigateTo: noop,
-        onClose: noop,
-        onGoBack: noop,
-        onGoToRoot: noop,
-        repositories: {
-          conversation: conversationRepository,
-          team: TestFactory.team_repository,
-          user: TestFactory.user_repository,
-        },
-      });
-    });
-  });
-
   describe('getConversationActions', () => {
     it("returns the right actions depending on the conversation's type for non group creators", () => {
       const conversation = new Conversation();
@@ -52,24 +31,42 @@ describe('ConversationDetailsViewModel', () => {
       spyOn(conversation, 'is_cleared').and.returnValue(false);
       spyOn(conversation, 'isCreatedBySelf').and.returnValue(false);
 
+      const conversationDetailsViewModel = new ConversationDetailsViewModel({
+        isVisible: noop,
+        mainViewModel: {},
+        navigateTo: noop,
+        onClose: noop,
+        onGoBack: noop,
+        onGoToRoot: noop,
+        repositories: {
+          conversation: {
+            active_conversation: () => conversation,
+            conversationRoleRepository: {canDeleteGroup: () => true, canLeaveGroup: () => true},
+          },
+          team: {
+            isTeam: () => true,
+          },
+        },
+      });
+
       const tests = [
         {
-          conversationType: ConversationType.ONE2ONE,
+          conversationType: CONVERSATION_TYPE.ONE_TO_ONE,
           expected: ['go-create-group', 'do-archive', 'do-clear', 'do-block'],
           permission: {canCreateGroupConversation: () => true},
         },
         {
-          conversationType: ConversationType.ONE2ONE,
+          conversationType: CONVERSATION_TYPE.ONE_TO_ONE,
           expected: ['do-archive', 'do-clear', 'do-block'],
           permission: {canCreateGroupConversation: () => false},
         },
         {
-          conversationType: ConversationType.GROUP,
+          conversationType: CONVERSATION_TYPE.REGULAR,
           expected: ['do-archive', 'do-clear', 'do-leave'],
           permission: {canCreateGroupConversation: () => true},
         },
         {
-          conversationType: ConversationType.CONNECT,
+          conversationType: CONVERSATION_TYPE.CONNECT,
           expected: ['do-archive', 'do-cancel-request', 'do-block'],
           permission: {canCreateGroupConversation: () => true},
         },
@@ -89,6 +86,25 @@ describe('ConversationDetailsViewModel', () => {
       spyOn(conversation, 'firstUserEntity').and.returnValue({isConnected: () => true});
       spyOn(conversation, 'is_cleared').and.returnValue(false);
       spyOn(conversation, 'isCreatedBySelf').and.returnValue(true);
+
+      const conversationDetailsViewModel = new ConversationDetailsViewModel({
+        isVisible: noop,
+        mainViewModel: {},
+        navigateTo: noop,
+        onClose: noop,
+        onGoBack: noop,
+        onGoToRoot: noop,
+        repositories: {
+          conversation: {
+            active_conversation: () => conversation,
+            conversationRoleRepository: {canDeleteGroup: () => true, canLeaveGroup: () => true},
+          },
+          team: {
+            isTeam: () => true,
+          },
+        },
+      });
+
       spyOn(conversationDetailsViewModel, 'isSelfGroupAdmin').and.returnValue(true);
       spyOn(conversationDetailsViewModel, 'isTeam').and.returnValue(true);
       spyOn(
@@ -98,22 +114,22 @@ describe('ConversationDetailsViewModel', () => {
 
       const tests = [
         {
-          conversationType: ConversationType.ONE2ONE,
+          conversationType: CONVERSATION_TYPE.ONE_TO_ONE,
           expected: ['go-create-group', 'do-archive', 'do-clear', 'do-block'],
           permission: {canCreateGroupConversation: () => true},
         },
         {
-          conversationType: ConversationType.ONE2ONE,
+          conversationType: CONVERSATION_TYPE.ONE_TO_ONE,
           expected: ['do-archive', 'do-clear', 'do-block'],
           permission: {canCreateGroupConversation: () => false},
         },
         {
-          conversationType: ConversationType.GROUP,
+          conversationType: CONVERSATION_TYPE.REGULAR,
           expected: ['do-archive', 'do-clear', 'do-leave', 'do-delete'],
           permission: {canCreateGroupConversation: () => true},
         },
         {
-          conversationType: ConversationType.CONNECT,
+          conversationType: CONVERSATION_TYPE.CONNECT,
           expected: ['do-archive', 'do-cancel-request', 'do-block'],
           permission: {canCreateGroupConversation: () => true},
         },

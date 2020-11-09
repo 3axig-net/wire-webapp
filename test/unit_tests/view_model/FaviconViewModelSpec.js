@@ -17,29 +17,30 @@
  *
  */
 
-import {WebAppEvents} from 'src/script/event/WebApp';
+import {WebAppEvents} from '@wireapp/webapp-events';
+import {FaviconViewModel} from 'src/script/view_model/FaviconViewModel';
 
-describe('z.viewModel.FaviconViewModel', () => {
+describe('FaviconViewModel', () => {
   it('subscribes to uread count events', () => {
     const dispatcher = {subscribe: () => {}};
     spyOn(dispatcher, 'subscribe').and.returnValue(undefined);
 
-    const faviconViewModel = new z.viewModel.FaviconViewModel(dispatcher);
+    const faviconViewModel = new FaviconViewModel(dispatcher);
 
     expect(dispatcher.subscribe).toHaveBeenCalledWith(
       WebAppEvents.LIFECYCLE.UNREAD_COUNT,
       faviconViewModel,
-      faviconViewModel._updateUnreadCount,
+      faviconViewModel.updateUnreadCount,
     );
   });
 
-  describe('_updateUnreadCount', () => {
+  describe('updateUnreadCount', () => {
     let faviconViewModel;
     let dispatcher;
 
     beforeEach(() => {
-      dispatcher = Object.assign({}, window.amplify);
-      faviconViewModel = new z.viewModel.FaviconViewModel(dispatcher);
+      dispatcher = {...window.amplify};
+      faviconViewModel = new FaviconViewModel(dispatcher);
     });
 
     afterEach(() => {

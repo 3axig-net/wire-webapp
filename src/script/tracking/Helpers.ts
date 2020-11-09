@@ -17,11 +17,10 @@
  *
  */
 
-import {Environment} from 'Util/Environment';
-
 import {Conversation} from '../entity/Conversation';
-import {User} from '../entity/User';
-import {ConversationType, PlatformType, UserType} from './attribute';
+import type {User} from '../entity/User';
+import {ConversationType, UserType, PlatformType} from './attribute';
+import {Runtime} from '@wireapp/commons';
 
 /**
  * Get corresponding tracking attribute for conversation type.
@@ -60,7 +59,10 @@ export function getGuestAttributes(conversationEntity: Conversation): {is_allow_
   };
 }
 
-export function getParticipantTypes(userEntities: User[], countSelf?: boolean): {guests: number; users: number} {
+export function getParticipantTypes(
+  userEntities: User[],
+  countSelf?: boolean,
+): {guests: number; temporaryGuests: number; users: number} {
   const initialValue = {guests: 0, temporaryGuests: 0, users: countSelf ? 1 : 0};
   return userEntities.reduce((accumulator, userEntity) => {
     if (userEntity.isTemporaryGuest()) {
@@ -80,12 +82,12 @@ export function getParticipantTypes(userEntities: User[], countSelf?: boolean): 
  * @returns Mapped platform type
  */
 export function getPlatform(): PlatformType {
-  if (!Environment.desktop) {
+  if (!Runtime.isDesktopApp()) {
     return PlatformType.BROWSER_APP;
   }
 
-  if (Environment.os.win) {
+  if (Runtime.isWindows()) {
     return PlatformType.DESKTOP_WINDOWS;
   }
-  return Environment.os.mac ? PlatformType.DESKTOP_MACOS : PlatformType.DESKTOP_LINUX;
+  return Runtime.isMacOS() ? PlatformType.DESKTOP_MACOS : PlatformType.DESKTOP_LINUX;
 }

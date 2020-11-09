@@ -17,15 +17,15 @@
  *
  */
 
-import UUID from 'uuidjs';
-
 import {noop} from 'Util/util';
+import {createRandomUuid} from 'Util/util';
 
 import {GroupParticipantUserViewModel} from 'src/script/view_model/panel/GroupParticipantUserViewModel';
 import {User} from 'src/script/entity/User';
+import {TestFactory} from '../../../helper/TestFactory';
 
 describe('GroupParticipantUserViewModel', () => {
-  const testFactory = new window.TestFactory();
+  const testFactory = new TestFactory();
   let groupParticipantUserViewModel;
 
   beforeEach(() => {
@@ -38,15 +38,16 @@ describe('GroupParticipantUserViewModel', () => {
         onGoBack: noop,
         onGoToRoot: noop,
         repositories: {
-          conversation: TestFactory.conversation_repository,
-          user: TestFactory.user_repository,
+          conversation: testFactory.conversation_repository,
+          team: testFactory.team_repository,
+          user: testFactory.user_repository,
         },
       });
     });
   });
 
   it('returns the id of the entity attached', () => {
-    const userId = UUID.genV4();
+    const userId = createRandomUuid();
     const user = new User(userId);
     groupParticipantUserViewModel.initView({entity: user});
 

@@ -17,21 +17,23 @@
  *
  */
 
-import {WebAppEvents} from '../event/WebApp';
+import {WebAppEvents} from '@wireapp/webapp-events';
+
 import {ROLE} from '../user/UserPermission';
 import {Environment} from './Environment';
+import {Runtime} from '@wireapp/commons';
 
 export function exposeWrapperGlobals(): void {
-  if (Environment.desktop && Environment.electron) {
-    window.z = window.z || {};
+  if (Runtime.isDesktopApp()) {
+    window.z ||= {};
 
-    window.z.event = window.z.event || {};
+    window.z.event ||= {};
     window.z.event.WebApp = WebAppEvents;
 
-    window.z.util = window.z.util || {};
+    window.z.util ||= {};
     window.z.util.Environment = Environment;
 
-    window.z.team = window.z.team || {};
+    window.z.team ||= {};
     window.z.team.ROLE = ROLE;
   }
 }

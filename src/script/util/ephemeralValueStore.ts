@@ -37,6 +37,9 @@ interface ValueStoreAction {
   value?: string;
 }
 
+/**
+ * Returns the ephemeral value and deletes it directly after so it can be only retrieved once.
+ */
 export async function getEphemeralValue(): Promise<any> {
   const worker = await getWorker();
   return sendMessage(worker, {action: ValueStoreActionType.GET});
@@ -60,7 +63,9 @@ export async function saveEphemeralValue(value: string): Promise<string> {
 }
 
 async function getWorker(): Promise<ServiceWorker> {
-  const registration = await navigator.serviceWorker.register(`/worker/sw-value-store.js?${Config.VERSION}`);
+  const registration = await navigator.serviceWorker.register(
+    `/worker/sw-value-store.js?${Config.getConfig().VERSION}`,
+  );
   worker = registration.installing || registration.waiting || registration.active;
   return worker;
 }

@@ -19,18 +19,18 @@
 
 const path = require('path');
 const webpack = require('webpack');
+const WorkboxPlugin = require('workbox-webpack-plugin');
 const {ROOT_PATH, DIST_PATH, SRC_PATH} = require('./locations');
 
 const dist = path.resolve(DIST_PATH, 'static');
-const auth = path.resolve(SRC_PATH, 'script', 'auth');
+const auth = path.resolve(SRC_PATH, 'script/auth');
 const srcScript = path.resolve(SRC_PATH, 'script');
 
 module.exports = {
   devtool: 'source-map',
   entry: {
-    app: path.resolve(srcScript, 'main/app.js'),
+    app: path.resolve(srcScript, 'main/app.ts'),
     auth: path.resolve(auth, 'main.tsx'),
-    login: path.resolve(srcScript, 'main/login.js'),
   },
   externals: {
     'fs-extra': '{}',
@@ -83,17 +83,22 @@ module.exports = {
     publicPath: '/',
   },
   plugins: [
-    new webpack.IgnorePlugin(/^.\/locale$/, /moment$/),
     new webpack.ProvidePlugin({
       $: 'jquery',
       _: 'underscore',
       jQuery: 'jquery',
       ko: 'knockout',
     }),
+    new WorkboxPlugin.InjectManifest({
+      maximumFileSizeToCacheInBytes: process.env.NODE_ENV !== 'production' ? 10 * 1024 * 1024 : undefined,
+      swDest: path.resolve(dist, 'sw.js'),
+      swSrc: path.resolve(SRC_PATH, 'sw.js'),
+    }),
   ],
   resolve: {
     alias: {
       Components: path.resolve(srcScript, 'components'),
+      I18n: path.resolve(SRC_PATH, 'i18n'),
       Resource: path.resolve(ROOT_PATH, 'resource'),
       Util: path.resolve(srcScript, 'util'),
     },

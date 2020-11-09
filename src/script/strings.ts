@@ -17,8 +17,9 @@
  *
  */
 
-import {SyntheticErrorLabel} from '@wireapp/api-client/dist/http';
+import {BackendErrorLabel, SyntheticErrorLabel} from '@wireapp/api-client/src/http';
 import {defineMessages} from 'react-intl';
+
 import {BackendError} from './auth/module/action/BackendError';
 import {LabeledError} from './auth/module/action/LabeledError';
 import {ValidationError} from './auth/module/action/ValidationError';
@@ -29,20 +30,55 @@ export const footerStrings = defineMessages({
     defaultMessage: '© Wire Swiss GmbH',
     id: 'footer.copy',
   },
-  wireLink: {
-    defaultMessage: 'wire.com',
-    id: 'footer.wireLink',
+});
+
+export const customEnvRedirectStrings = defineMessages({
+  credentialsInfo: {
+    defaultMessage: "Provide credentials only if you're sure this is your organization's login.",
+    id: 'customEnvRedirect.credentialsInfo',
+  },
+  redirectHeadline: {
+    defaultMessage: 'Redirecting...',
+    id: 'customEnvRedirect.redirectHeadline',
+  },
+  redirectTo: {
+    defaultMessage: 'You are being redirected to your dedicated enterprise service.',
+    id: 'customEnvRedirect.redirectTo',
   },
 });
 
 export const cookiePolicyStrings = defineMessages({
   bannerText: {
-    defaultMessage: `We use cookies to personalize your experience on our website. By continuing to use the website, you agree to the use of cookies.<br/>Further information on cookies can be found in our <b>privacy policy</b>.`,
+    defaultMessage:
+      'We use cookies to personalize your experience on our website. By continuing to use the website, you agree to the use of cookies.{newline}Further information on cookies can be found in our <strong>privacy policy</strong>.',
     id: 'cookiePolicyStrings.bannerText',
   },
 });
 
 export const indexStrings = defineMessages({
+  createAccount: {
+    defaultMessage: 'Create account',
+    id: 'index.createAccount',
+  },
+  enterprise: {
+    defaultMessage: 'Enterprise Login',
+    id: 'index.enterprise',
+  },
+  logIn: {
+    defaultMessage: 'Log in',
+    id: 'index.login',
+  },
+  ssoLogin: {
+    defaultMessage: 'Log in with SSO',
+    id: 'index.ssoLogin',
+  },
+  welcome: {
+    defaultMessage: 'Welcome to {brandName}',
+    id: 'index.welcome',
+  },
+});
+
+export const setAccountTypeStrings = defineMessages({
   createAccountForOrganizations: {
     defaultMessage: 'Pro',
     id: 'index.createAccountForOrganizations',
@@ -52,20 +88,12 @@ export const indexStrings = defineMessages({
     id: 'index.createAccountForPersonalUse',
   },
   createPersonalAccount: {
-    defaultMessage: 'create an account',
+    defaultMessage: 'Chat privately with groups of friends and family',
     id: 'index.createPersonalAccount',
   },
   createTeam: {
-    defaultMessage: 'create a team',
+    defaultMessage: 'Secure collaboration for businesses, institutions and professional organizations',
     id: 'index.createTeam',
-  },
-  login: {
-    defaultMessage: 'Log in',
-    id: 'index.login',
-  },
-  loginInfo: {
-    defaultMessage: 'Already have an account?',
-    id: 'index.loginInfo',
   },
 });
 
@@ -115,8 +143,13 @@ export const accountFormStrings = defineMessages({
     id: 'accountForm.submitButton',
   },
   terms: {
-    defaultMessage: 'I accept the <a {linkParams}>terms and conditions</a>',
+    defaultMessage: 'I accept the <terms>terms and conditions</terms>',
     id: 'accountForm.terms',
+  },
+  termsAndPrivacyPolicy: {
+    defaultMessage:
+      'I accept the <privacypolicy>privacy policy</privacypolicy> and <terms>terms and conditions</terms>',
+    id: 'accountForm.termsAndPrivacyPolicy',
   },
 });
 
@@ -156,7 +189,7 @@ export const verifyStrings = defineMessages({
     id: 'verify.resendCode',
   },
   subhead: {
-    defaultMessage: 'Enter the verification code we sent to<br />{email}',
+    defaultMessage: 'Enter the verification code we sent to{newline}{email}',
     id: 'verify.subhead',
   },
 });
@@ -274,7 +307,7 @@ export const acceptNewsModalStrings = defineMessages({
     id: 'acceptNewsModal.headline',
   },
   privacyDescription: {
-    defaultMessage: 'Check our <b>Privacy Policy</b>.',
+    defaultMessage: 'Check our <strong>Privacy Policy</strong>.',
     id: 'acceptNewsModal.privacyDescription',
   },
   unsubscribeDescription: {
@@ -293,12 +326,12 @@ export const unsupportedStrings = defineMessages({
     id: 'unsupported.headlineCookies',
   },
   headlineIndexedDb: {
-    defaultMessage: 'You are in private mode',
+    defaultMessage: 'Your browser is in private mode',
     id: 'unsupported.headlineIndexedDb',
   },
   subheadBrowser: {
     defaultMessage:
-      'Download the latest version of <b style="font-weight: 600">Google Chrome, Mozilla Firefox, Opera</b style="font-weight: 600"> or <b style="font-weight: 600">Microsoft Edge.</b>',
+      'Download the latest version of <strong>Google Chrome, Mozilla Firefox, Opera</strong> or <strong>Microsoft Edge.</strong>',
     id: 'unsupported.subheadBrowser',
   },
   subheadCookies: {
@@ -314,7 +347,7 @@ export const unsupportedStrings = defineMessages({
 
 export const unsupportedJoinStrings = defineMessages({
   unsupportedJoinHeadline: {
-    defaultMessage: 'You have been invited <br />to join a <b style="color: black;">{brandName} guest room.</b>',
+    defaultMessage: 'You have been invited {newline}to join a <strong>{brandName} guest room.</strong>',
     id: 'conversationJoin.unsupportedJoinHeadline',
   },
   unsupportedJoinMobileSubhead: {
@@ -325,8 +358,7 @@ export const unsupportedJoinStrings = defineMessages({
 
 export const conversationJoinStrings = defineMessages({
   existentAccountHeadline: {
-    defaultMessage:
-      '{name}, you have been invited <br />to join a <b style="color: black;">{brandName} guest room.</b>',
+    defaultMessage: '{name}, you have been invited {newline}to join a <strong>{brandName} guest room.</strong>',
     id: 'conversationJoin.existentAccountHeadline',
   },
   existentAccountJoinWithoutLink: {
@@ -346,7 +378,7 @@ export const conversationJoinStrings = defineMessages({
     id: 'conversationJoin.subheadExistentAccount',
   },
   fullConversationHeadline: {
-    defaultMessage: 'This <b style="color: black;">{brandName} guest room</b><br />is full.',
+    defaultMessage: 'This <strong>{brandName} guest room</strong>{newline}is full.',
     id: 'conversationJoin.fullConversationHeadline',
   },
   fullConversationSubhead: {
@@ -358,7 +390,7 @@ export const conversationJoinStrings = defineMessages({
     id: 'conversationJoin.hasAccount',
   },
   headline: {
-    defaultMessage: 'You have been invited <br />to join a <b style="color: black;">{brandName} guest room.</b>',
+    defaultMessage: 'You have been invited {newline}to join a <strong>{brandName} guest room.</strong>',
     id: 'conversationJoin.headline',
   },
   invalidCreateAccountLink: {
@@ -370,7 +402,7 @@ export const conversationJoinStrings = defineMessages({
     id: 'conversationJoin.invalidCreateAccountText',
   },
   invalidHeadline: {
-    defaultMessage: 'This <b style="color: black;">{brandName} guest room</b><br />is now closed.',
+    defaultMessage: 'This <strong>{brandName} guest room</strong>{newline}is now closed.',
     id: 'conversationJoin.invalidHeadline',
   },
   invalidSubhead: {
@@ -386,7 +418,7 @@ export const conversationJoinStrings = defineMessages({
     id: 'conversationJoin.namePlaceholder',
   },
   subhead: {
-    defaultMessage: 'Encrypted group messaging and conference calls. <br />No account necessary.',
+    defaultMessage: 'Encrypted group messaging and conference calls. {newline}No account necessary.',
     id: 'conversationJoin.subhead',
   },
 });
@@ -437,8 +469,7 @@ export const errorHandlerStrings = defineMessages({
     id: 'BackendError.LABEL.INVALID_EMAIL',
   },
   [BackendError.LABEL.KEY_EXISTS]: {
-    defaultMessage:
-      'This email address has already been registered. <a target="_blank" rel="noopener noreferrer" href="https://support.wire.com/hc/articles/115004082129">Learn more</a>',
+    defaultMessage: 'This email address has already been registered. {supportEmailExistsLink}',
     id: 'BackendError.LABEL.KEY_EXISTS',
   },
   [BackendError.LABEL.ALREADY_INVITED]: {
@@ -522,8 +553,7 @@ export const errorHandlerStrings = defineMessages({
     id: 'BackendError.LABEL.SUSPENDED',
   },
   [BackendError.LABEL.EMAIL_EXISTS]: {
-    defaultMessage:
-      'This email address is already in use. <a target="_blank" rel="noopener noreferrer" href="https://support.wire.com/hc/articles/115004082129">Learn more</a>',
+    defaultMessage: 'This email address is already in use. {supportEmailExistsLink}',
     id: 'BackendError.LABEL.EMAIL_EXISTS',
   },
   [BackendError.LABEL.SSO_FORBIDDEN]: {
@@ -554,10 +584,6 @@ export const errorHandlerStrings = defineMessages({
     defaultMessage: 'Something went wrong. Please contact your team administrator for details (Error 9).',
     id: 'BackendError.LABEL.SSO_NO_MATCHING_AUTH',
   },
-  [BackendError.LABEL.SSO_NO_SSO_CODE]: {
-    defaultMessage: 'No SSO access code detected',
-    id: 'BackendError.LABEL.NO_SSO_CODE',
-  },
   [BackendError.LABEL.SSO_NOT_FOUND]: {
     defaultMessage: 'Something went wrong. Please contact your team administrator for details (Error 7).',
     id: 'BackendError.LABEL.SSO_NOT_FOUND',
@@ -578,6 +604,14 @@ export const errorHandlerStrings = defineMessages({
     defaultMessage: 'Not enough disk space',
     id: 'LabeledError.GENERAL_ERRORS.LOW_DISK_SPACE',
   },
+  [BackendErrorLabel.CUSTOM_BACKEND_NOT_FOUND]: {
+    defaultMessage: 'This email cannot be used for enterprise login. Please enter the SSO code to proceed.',
+    id: 'BackendErrorLabel.CUSTOM_BACKEND_NOT_FOUND',
+  },
+  learnMore: {
+    defaultMessage: 'Learn more',
+    id: 'BackendError.learnMore',
+  },
   unexpected: {
     defaultMessage: 'Unexpected error',
     id: 'BackendError.unexpected',
@@ -595,16 +629,20 @@ export const validationErrorStrings = defineMessages({
   },
   [ValidationError.FIELD.PASSWORD.PATTERN_MISMATCH]: {
     defaultMessage:
-      'Use at least 8 characters, with one lowercase letter, one capital letter, a number, and a special character.',
+      'Use at least {minPasswordLength} characters, with one lowercase letter, one capital letter, a number, and a special character.',
     id: 'ValidationError.FIELD.PASSWORD.PATTERN_MISMATCH',
   },
   [ValidationError.FIELD.PASSWORD_LOGIN.PATTERN_MISMATCH]: {
     defaultMessage: 'Wrong password. Please try again.',
     id: 'ValidationError.FIELD.PASSWORD_LOGIN.PATTERN_MISMATCH',
   },
-  [ValidationError.FIELD.SSO_LOGIN.PATTERN_MISMATCH]: {
-    defaultMessage: 'Invalid code',
-    id: 'ValidationError.FIELD.SSO_LOGIN.PATTERN_MISMATCH',
+  [ValidationError.FIELD.SSO_CODE.PATTERN_MISMATCH]: {
+    defaultMessage: 'Please enter a valid SSO code',
+    id: 'ValidationError.FIELD.SSO_CODE.PATTERN_MISMATCH',
+  },
+  [ValidationError.FIELD.SSO_EMAIL_CODE.PATTERN_MISMATCH]: {
+    defaultMessage: 'Please enter a valid email or SSO code',
+    id: 'ValidationError.FIELD.SSO_EMAIL_CODE.PATTERN_MISMATCH',
   },
   [ValidationError.FIELD.EMAIL.TYPE_MISMATCH]: {
     defaultMessage: 'Please enter a valid email address',
@@ -653,8 +691,12 @@ export const loginStrings = defineMessages({
 
 export const ssoLoginStrings = defineMessages({
   codeInputPlaceholder: {
-    defaultMessage: 'SSO Code',
+    defaultMessage: 'SSO code',
     id: 'ssoLogin.codeInputPlaceholder',
+  },
+  codeOrMailInputPlaceholder: {
+    defaultMessage: 'Email or SSO code',
+    id: 'ssoLogin.codeOrMailInputPlaceholder',
   },
   headline: {
     defaultMessage: 'Company log in',
@@ -668,13 +710,18 @@ export const ssoLoginStrings = defineMessages({
     defaultMessage: 'Click to continue',
     id: 'ssoLogin.overlayFocusLink',
   },
-  pasteButton: {
-    defaultMessage: 'Paste code',
-    id: 'ssoLogin.pasteButton',
+  subheadCode: {
+    defaultMessage: 'Please enter your SSO code',
+    id: 'ssoLogin.subheadCode',
   },
-  subhead: {
-    defaultMessage: 'Enter the company SSO access code.',
-    id: 'ssoLogin.subhead',
+  subheadCodeOrEmail: {
+    defaultMessage: 'Please enter your email or SSO code.',
+    id: 'ssoLogin.subheadCodeOrEmail',
+  },
+  subheadEmailEnvironmentSwitchWarning: {
+    defaultMessage:
+      'If your email matches an enterprise installation of {brandName}, this app will connect to that server.',
+    id: 'ssoLogin.subheadEmailEnvironmentSwitchWarning',
   },
 });
 
@@ -696,7 +743,7 @@ export const phoneLoginStrings = defineMessages({
     id: 'authVerifyCodeChangePhone',
   },
   verifyCodeDescription: {
-    defaultMessage: 'Enter the verification code\nwe sent to {number}.',
+    defaultMessage: 'Enter the verification code we sent to {number}.',
     id: 'authVerifyCodeDescription',
   },
   verifyCodeResend: {
@@ -719,7 +766,7 @@ export const logoutReasonStrings = defineMessages({
     id: 'LOGOUT_REASON.CLIENT_REMOVED',
   },
   [LOGOUT_REASON.SESSION_EXPIRED]: {
-    defaultMessage: 'You were signed out because your session expired.<br />Please log in again.',
+    defaultMessage: 'You were signed out because your session expired.{newline}Please log in again.',
     id: 'LOGOUT_REASON.SESSION_EXPIRED',
   },
 });
@@ -752,7 +799,7 @@ export const historyInfoStrings = defineMessages({
     id: 'historyInfo.hasHistoryHeadline',
   },
   hasHistoryInfo: {
-    defaultMessage: 'Messages sent in the meantime<br/>will not appear here.',
+    defaultMessage: 'Messages sent in the meantime {newline}will not appear here.',
     id: 'historyInfo.hasHistoryInfo',
   },
   learnMore: {
@@ -764,7 +811,7 @@ export const historyInfoStrings = defineMessages({
     id: 'historyInfo.noHistoryHeadline',
   },
   noHistoryInfo: {
-    defaultMessage: 'For privacy reasons,<br/>your conversation history will not appear here.',
+    defaultMessage: 'For privacy reasons, {newline}your conversation history will not appear here.',
     id: 'historyInfo.noHistoryInfo',
   },
   ok: {

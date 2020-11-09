@@ -17,7 +17,8 @@
  *
  */
 
-import {Self} from '@wireapp/api-client/dist/self';
+import type {Self} from '@wireapp/api-client/src/self';
+
 import {AppActions, SELF_ACTION} from '../action/creator/';
 
 export interface SelfState {
@@ -25,8 +26,8 @@ export interface SelfState {
   error: Error;
   fetched: boolean;
   fetching: boolean;
-  self: Self;
   hasPassword: boolean;
+  self: Self;
 }
 
 export const initialSelfState: SelfState = {
@@ -71,11 +72,10 @@ export function selfReducer(state: SelfState = initialSelfState, action: AppActi
     case SELF_ACTION.CONSENT_GET_SUCCESS: {
       return {
         ...state,
-        consents: action.payload.reduce(
-          (consentAccumulator, consent) => ({...consentAccumulator, [consent.type]: consent.value}),
-          {},
-        ),
-
+        consents: action.payload.reduce<Record<number, number>>((consentAccumulator, consent) => {
+          consentAccumulator[consent.type] = consent.value;
+          return consentAccumulator;
+        }, {}),
         error: null,
         fetched: true,
         fetching: false,

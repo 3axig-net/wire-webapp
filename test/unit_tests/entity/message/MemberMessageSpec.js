@@ -27,7 +27,7 @@ import {ContentMessage} from 'src/script/entity/message/ContentMessage';
 import {AssetTransferState} from 'src/script/assets/AssetTransferState';
 
 import {StatusType} from 'src/script/message/StatusType';
-import {File} from 'src/script/entity/message/File';
+import {FileAsset} from 'src/script/entity/message/FileAsset';
 
 describe('Member Message', () => {
   describe('generateNameString', () => {
@@ -42,7 +42,7 @@ describe('Member Message', () => {
       user_a.name('John');
       message_et.userEntities.push(user_a);
 
-      expect(message_et._generateNameString()).toBe('[bold]John[/bold]');
+      expect(message_et.generateNameString()).toBe('[bold]John[/bold]');
     });
 
     it('can return correct string for two users', () => {
@@ -52,7 +52,7 @@ describe('Member Message', () => {
       user_b.name('Jim');
       message_et.userEntities.push(user_a, user_b);
 
-      expect(message_et._generateNameString()).toBe('[bold]Jim[/bold] and [bold]John[/bold]');
+      expect(message_et.generateNameString()).toBe('[bold]Jim[/bold] and [bold]John[/bold]');
     });
 
     it('can return correct string for more than two users', () => {
@@ -64,7 +64,7 @@ describe('Member Message', () => {
       user_c.name('Jill');
       message_et.userEntities.push(user_a, user_b, user_c);
 
-      expect(message_et._generateNameString()).toBe('[bold]Jill[/bold], [bold]Jim[/bold], and [bold]John[/bold]');
+      expect(message_et.generateNameString()).toBe('[bold]Jill[/bold], [bold]Jim[/bold], and [bold]John[/bold]');
     });
 
     it('can return correct string for more than one user without sender', () => {
@@ -80,7 +80,7 @@ describe('Member Message', () => {
       user_c.name('Jill');
       message_et.userEntities.push(user_sender, user_a, user_b, user_c);
 
-      expect(message_et._generateNameString()).toBe('[bold]Jill[/bold], [bold]Jim[/bold], and [bold]John[/bold]');
+      expect(message_et.generateNameString()).toBe('[bold]Jill[/bold], [bold]Jim[/bold], and [bold]John[/bold]');
     });
   });
 
@@ -104,12 +104,12 @@ describe('Member Message', () => {
       expect(message_et.is_deletable()).toBe(false);
     });
 
-    it('should be deletable when message is a file and uploading or downloading', () => {
-      const file_et = new File();
+    it('should not be deletable when message is a file and uploading or downloading', () => {
+      const file_et = new FileAsset();
       file_et.status(AssetTransferState.UPLOADING);
       message_et.assets.push(file_et);
 
-      expect(message_et.is_deletable()).toBe(true);
+      expect(message_et.is_deletable()).toBe(false);
     });
   });
 
@@ -130,8 +130,8 @@ describe('Member Message', () => {
       expect(message_et.has_asset_file()).toBeFalsy();
     });
 
-    it('should return true for File asset', () => {
-      message_et.assets.push(new File());
+    it('should return true for FileAsset asset', () => {
+      message_et.assets.push(new FileAsset());
 
       expect(message_et.has_asset_file()).toBeTruthy();
     });

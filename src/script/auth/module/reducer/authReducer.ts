@@ -17,10 +17,12 @@
  *
  */
 
-import {LoginData} from '@wireapp/api-client/dist/auth';
-import {ClientType} from '@wireapp/api-client/dist/client';
-import {TeamData} from '@wireapp/api-client/dist/team';
-import {UserAsset} from '@wireapp/api-client/dist/user';
+import type {SSOSettings} from '@wireapp/api-client/src/account/SSOSettings';
+import type {LoginData} from '@wireapp/api-client/src/auth';
+import {ClientType} from '@wireapp/api-client/src/client';
+import type {TeamData} from '@wireapp/api-client/src/team';
+import type {UserAsset} from '@wireapp/api-client/src/user';
+
 import {Config} from '../../../Config';
 import {AUTH_ACTION, AppActions, USER_ACTION} from '../action/creator/';
 import {REGISTER_FLOW} from '../selector/AuthSelector';
@@ -47,8 +49,10 @@ export type AuthState = {
   readonly error: Error;
   readonly fetched: boolean;
   readonly fetching: boolean;
+  readonly fetchingSSOSettings: boolean;
   readonly isAuthenticated: boolean;
   readonly loginData: Partial<LoginData>;
+  readonly ssoSettings?: SSOSettings;
 };
 
 export const initialAuthState: AuthState = {
@@ -71,8 +75,14 @@ export const initialAuthState: AuthState = {
   error: null,
   fetched: false,
   fetching: false,
+  fetchingSSOSettings: true,
   isAuthenticated: false,
-  loginData: {clientType: Config.FEATURE.DEFAULT_LOGIN_TEMPORARY_CLIENT ? ClientType.TEMPORARY : ClientType.PERMANENT},
+  loginData: {
+    clientType: Config.getConfig().FEATURE.DEFAULT_LOGIN_TEMPORARY_CLIENT ? ClientType.TEMPORARY : ClientType.PERMANENT,
+  },
+  ssoSettings: {
+    default_sso_code: undefined,
+  },
 };
 
 export function authReducer(state: AuthState = initialAuthState, action: AppActions): AuthState {
@@ -129,6 +139,25 @@ export function authReducer(state: AuthState = initialAuthState, action: AppActi
         isAuthenticated: true,
       };
     }
+    case AUTH_ACTION.GET_SSO_SETTINGS_START: {
+      return {
+        ...state,
+        fetchingSSOSettings: true,
+      };
+    }
+    case AUTH_ACTION.GET_SSO_SETTINGS_SUCCESS: {
+      return {
+        ...state,
+        fetchingSSOSettings: false,
+        ssoSettings: action.payload,
+      };
+    }
+    case AUTH_ACTION.GET_SSO_SETTINGS_FAILED: {
+      return {
+        ...state,
+        fetchingSSOSettings: false,
+      };
+    }
     case AUTH_ACTION.REGISTER_PUSH_ACCOUNT_DATA: {
       return {...state, account: {...state.account, ...action.payload}, error: null};
     }
@@ -136,20 +165,18 @@ export function authReducer(state: AuthState = initialAuthState, action: AppActi
       return {...state, account: {...initialAuthState.account}, error: null};
     }
     case AUTH_ACTION.PUSH_LOGIN_DATA: {
-      return {...state, loginData: {...state.loginData, ...action.payload}, error: null};
+      return {...state, error: null, loginData: {...state.loginData, ...action.payload}};
     }
     case AUTH_ACTION.RESET_LOGIN_DATA: {
-      return {...state, loginData: {...initialAuthState.loginData}, error: null};
+      return {...state, error: null, loginData: {...initialAuthState.loginData}};
     }
     case AUTH_ACTION.LOGOUT_SUCCESS: {
-      return {...initialAuthState};
+      return {...initialAuthState, fetchingSSOSettings: false};
     }
     case AUTH_ACTION.SILENT_LOGOUT_SUCCESS: {
       return {
         ...state,
         error: null,
-        fetched: false,
-        fetching: false,
         isAuthenticated: false,
       };
     }

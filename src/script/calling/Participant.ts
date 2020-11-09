@@ -19,24 +19,33 @@
 
 import {VIDEO_STATE} from '@wireapp/avs';
 import ko from 'knockout';
+import {User} from '../entity/User';
 
 export type UserId = string;
-export type DeviceId = string;
+export type ClientId = string;
+
+export enum VideoFillMode {
+  UNSET,
+  CONTAIN,
+  COVER,
+}
 
 export class Participant {
-  public userId: UserId;
-  public deviceId: DeviceId;
-  public videoState: ko.Observable<number>;
+  // Video
+  public videoState: ko.Observable<VIDEO_STATE>;
   public videoStream: ko.Observable<MediaStream | undefined>;
-  public audioStream: ko.Observable<MediaStream | undefined>;
   public hasActiveVideo: ko.PureComputed<boolean>;
+  public hasPausedVideo: ko.PureComputed<boolean>;
   public sharesScreen: ko.PureComputed<boolean>;
   public sharesCamera: ko.PureComputed<boolean>;
-  public hasPausedVideo: ko.PureComputed<boolean>;
+  public startedScreenSharingAt: ko.Observable<number>;
 
-  constructor(userId: UserId, deviceId: DeviceId) {
-    this.userId = userId;
-    this.deviceId = deviceId;
+  // Audio
+  public audioStream: ko.Observable<MediaStream | undefined>;
+  public isMuted: ko.Observable<boolean>;
+  public videoFillMode: ko.Observable<VideoFillMode>;
+
+  constructor(public user: User, public clientId: ClientId) {
     this.videoState = ko.observable(VIDEO_STATE.STOPPED);
     this.hasActiveVideo = ko.pureComputed(() => {
       return (this.sharesCamera() || this.sharesScreen()) && !!this.videoStream();
@@ -52,14 +61,19 @@ export class Participant {
     });
     this.videoStream = ko.observable();
     this.audioStream = ko.observable();
+    this.startedScreenSharingAt = ko.observable();
+    this.isMuted = ko.observable(false);
+    this.videoFillMode = ko.observable(VideoFillMode.UNSET);
   }
+
+  doesMatchIds = (userId: UserId, clientId: ClientId): boolean => userId === this.user.id && clientId === this.clientId;
 
   setAudioStream(audioStream: MediaStream): void {
     this.releaseStream(this.audioStream());
     this.audioStream(audioStream);
   }
 
-  setVideoStream(videoStream: MediaStream | undefined): void {
+  setVideoStream(videoStream?: MediaStream): void {
     this.releaseStream(this.videoStream());
     this.videoStream(videoStream);
   }
@@ -95,7 +109,7 @@ export class Participant {
     this.releaseAudioStream();
   }
 
-  private releaseStream(mediaStream: MediaStream | undefined): void {
+  private releaseStream(mediaStream?: MediaStream): void {
     if (!mediaStream) {
       return;
     }

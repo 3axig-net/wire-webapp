@@ -18,7 +18,6 @@
  */
 
 import ko from 'knockout';
-
 import {Availability} from '@wireapp/protocol-messaging';
 
 interface AvailabilityStateParams {
@@ -46,7 +45,7 @@ ko.components.register('availability-state', {
         <span class="availability-state-arrow"></span>
       <!-- /ko -->
         `,
-  viewModel: function({availability, label, showArrow = false, theme = false}: AvailabilityStateParams): void {
+  viewModel: function ({availability, label, showArrow = false, theme = false}: AvailabilityStateParams): void {
     this.isAvailable = () => availability() === Availability.Type.AVAILABLE;
     this.isAway = () => availability() === Availability.Type.AWAY;
     this.isBusy = () => availability() === Availability.Type.BUSY;

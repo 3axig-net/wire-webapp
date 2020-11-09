@@ -22,8 +22,8 @@ import {
   InvalidPhoneNumberError,
   LoginData,
   PasswordExistsError,
-} from '@wireapp/api-client/dist/auth';
-import {ClientType} from '@wireapp/api-client/dist/client/index';
+} from '@wireapp/api-client/src/auth';
+import {ClientType} from '@wireapp/api-client/src/client/index';
 import {
   ArrowIcon,
   COLOR,
@@ -33,7 +33,6 @@ import {
   Columns,
   Container,
   ContainerXS,
-  ErrorMessage,
   Form,
   H1,
   IsMobile,
@@ -52,7 +51,7 @@ import {ValidationError} from '../module/action/ValidationError';
 import {RootState, bindActionCreators} from '../module/reducer';
 import * as AuthSelector from '../module/selector/AuthSelector';
 import {ROUTE} from '../route';
-import {isDesktopApp} from '../Runtime';
+import {Runtime} from '@wireapp/commons';
 import {isValidationError, parseError, parseValidationErrors} from '../util/errorUtil';
 import Page from './Page';
 
@@ -128,16 +127,14 @@ const PhoneLogin = ({
                 <H1 center>{_(phoneLoginStrings.loginHead)}</H1>
                 <Form style={{marginTop: 30}} data-uie-name="login">
                   <PhoneLoginForm isFetching={isFetching} onSubmit={handleSubmit} />
-                  <ErrorMessage data-uie-name="error-message">
-                    {!error ? (
-                      <div style={{marginTop: '4px'}}>&nbsp;</div>
-                    ) : isValidationError(error) ? (
-                      parseValidationErrors(error)
-                    ) : (
-                      parseError(error)
-                    )}
-                  </ErrorMessage>
-                  {!isDesktopApp() && (
+                  {!error ? (
+                    <div style={{marginTop: '4px'}}>&nbsp;</div>
+                  ) : isValidationError(error) ? (
+                    parseValidationErrors(error)
+                  ) : (
+                    parseError(error)
+                  )}
+                  {!Runtime.isDesktopApp() && (
                     <Checkbox
                       tabIndex={4}
                       onChange={(event: React.ChangeEvent<HTMLInputElement>) => {

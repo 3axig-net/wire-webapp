@@ -19,31 +19,31 @@
 
 import {amplify} from 'amplify';
 import {intersection} from 'underscore';
+import {WebAppEvents} from '@wireapp/webapp-events';
 
 import {Logger, getLogger} from 'Util/Logger';
 
-import {Conversation} from '../entity/Conversation';
-import {EventRepository} from '../event/EventRepository';
-import {WebAppEvents} from '../event/WebApp';
-import {VerificationMessageType} from '../message/VerificationMessageType';
-import {ServerTimeHandler} from '../time/serverTimeHandler';
-import {ConversationRepository} from './ConversationRepository';
 import {ConversationVerificationState} from './ConversationVerificationState';
+import {EventBuilder} from '../conversation/EventBuilder';
+import {EventRecord} from '../storage';
+import {VerificationMessageType} from '../message/VerificationMessageType';
+import type {ClientEntity} from '../client/ClientEntity';
+import type {Conversation} from '../entity/Conversation';
+import type {EventRepository} from '../event/EventRepository';
+import type {ServerTimeHandler} from '../time/serverTimeHandler';
+import {container} from 'tsyringe';
+import {UserState} from '../user/UserState';
+import {ConversationState} from './ConversationState';
 
 export class ConversationVerificationStateHandler {
-  conversationRepository: ConversationRepository;
-  eventRepository: EventRepository;
-  serverTimeHandler: ServerTimeHandler;
-  logger: Logger;
+  private readonly logger: Logger;
 
   constructor(
-    conversationRepository: ConversationRepository,
-    eventRepository: EventRepository,
-    serverTimeHandler: ServerTimeHandler,
+    private readonly eventRepository: EventRepository,
+    private readonly serverTimeHandler: ServerTimeHandler,
+    private readonly userState = container.resolve(UserState),
+    private readonly conversationState = container.resolve(ConversationState),
   ) {
-    this.conversationRepository = conversationRepository;
-    this.eventRepository = eventRepository;
-    this.serverTimeHandler = serverTimeHandler;
     this.logger = getLogger('ConversationVerificationStateHandler');
 
     amplify.subscribe(WebAppEvents.USER.CLIENT_ADDED, this.onClientAdded.bind(this));
@@ -65,7 +65,7 @@ export class ConversationVerificationStateHandler {
    * Self user or other participant added clients.
    * @param userId ID of user that added client (can be self user ID)
    */
-  onClientAdded(userId: string): void {
+  onClientAdded(userId: string, _clientEntity?: ClientEntity): void {
     this.onClientsAdded([userId]);
   }
 
@@ -83,7 +83,7 @@ export class ConversationVerificationStateHandler {
    * Self user removed a client or other participants deleted clients.
    * @param userId ID of user that added client (can be self user ID)
    */
-  onClientRemoved(userId: string): void {
+  onClientRemoved(userId: string, _clientId?: string): void {
     this.getActiveConversationsWithUsers([userId]).forEach(({conversationEntity}) => {
       this.checkChangeToVerified(conversationEntity);
     });
@@ -135,11 +135,15 @@ export class ConversationVerificationStateHandler {
   private checkChangeToVerified(conversationEntity: Conversation): boolean {
     if (this.willChangeToVerified(conversationEntity)) {
       const currentTimestamp = this.serverTimeHandler.toServerTimestamp();
-      const allVerifiedEvent = window.z.conversation.EventBuilder.buildAllVerified(
-        conversationEntity,
-        currentTimestamp,
+      const allVerifiedEvent = EventBuilder.buildAllVerified(conversationEntity, currentTimestamp);
+      this.eventRepository.injectEvent(allVerifiedEvent as EventRecord);
+
+      amplify.publish(
+        WebAppEvents.CONVERSATION.VERIFICATION_STATE_CHANGED,
+        conversationEntity.participating_user_ids(),
+        true,
       );
-      this.eventRepository.injectEvent(allVerifiedEvent);
+
       return true;
     }
 
@@ -169,7 +173,7 @@ export class ConversationVerificationStateHandler {
        * Previously the code would hide this fact, not create a system message and then fail when it tried to prompt
        * the user to grant subsequent message sending - essentially blocking the conversation.
        *
-       * As we are unsure of the trigger of the degradation we temporarly throw an error to get to the bottom of this.
+       * As we are unsure of the trigger of the degradation we temporarily throw an error to get to the bottom of this.
        * The conversation is also reset to the verified state to ensure we can continue to send messages.
        */
       if (!userIds.length) {
@@ -178,13 +182,8 @@ export class ConversationVerificationStateHandler {
       }
 
       const currentTimestamp = this.serverTimeHandler.toServerTimestamp();
-      const event = window.z.conversation.EventBuilder.buildDegraded(
-        conversationEntity,
-        userIds,
-        type,
-        currentTimestamp,
-      );
-      this.eventRepository.injectEvent(event);
+      const event = EventBuilder.buildDegraded(conversationEntity, userIds, type, currentTimestamp);
+      this.eventRepository.injectEvent(event as EventRecord);
 
       return true;
     }
@@ -199,11 +198,11 @@ export class ConversationVerificationStateHandler {
    * @returns Array of objects containing the conversation entities and matching user IDs
    */
   private getActiveConversationsWithUsers(userIds: string[]): {conversationEntity: Conversation; userIds: string[]}[] {
-    return this.conversationRepository
+    return this.conversationState
       .filtered_conversations()
       .map((conversationEntity: Conversation) => {
         if (!conversationEntity.removed_from_conversation()) {
-          const selfUserId = this.conversationRepository.selfUser().id;
+          const selfUserId = this.userState.self().id;
           const userIdsInConversation = conversationEntity.participating_user_ids().concat(selfUserId);
           const matchingUserIds = intersection(userIdsInConversation, userIds);
 
@@ -250,7 +249,7 @@ export class ConversationVerificationStateHandler {
   /**
    * Check whether to verify conversation and set corresponding state
    *
-   * @param {Conversation} conversationEntity Conversation entity to evaluate
+   * @param conversationEntity Conversation entity to evaluate
    * @returns `true` if conversation state changed to verified
    */
   private willChangeToVerified(conversationEntity: Conversation): boolean {

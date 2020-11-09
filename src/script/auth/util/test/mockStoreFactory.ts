@@ -19,20 +19,21 @@
 
 const {createLogger} = require('redux-logger');
 import {APIClient} from '@wireapp/api-client';
-import {TypeUtil} from '@wireapp/commons';
+import type {TypeUtil} from '@wireapp/commons';
 import {Account} from '@wireapp/core';
 import Cookies, {CookiesStatic} from 'js-cookie';
 import configureStore from 'redux-mock-store';
 import thunk from 'redux-thunk';
-import {RootState, ThunkDispatch} from '../..//module/reducer';
+
+import type {RootState, ThunkDispatch} from '../..//module/reducer';
 import {ActionRoot, actionRoot} from '../../module/action/';
 
 export interface MockStoreParameters {
   actions?: TypeUtil.RecursivePartial<ActionRoot>;
   apiClient?: TypeUtil.RecursivePartial<APIClient>;
-  config?: any;
   cookieStore?: CookiesStatic<object>;
   core?: TypeUtil.RecursivePartial<Account>;
+  getConfig?: () => any;
   localStorage?: Storage;
 }
 
@@ -41,7 +42,7 @@ const defaultClient = new APIClient({urls: APIClient.BACKEND.STAGING});
 const defaultCore = new Account(defaultClient);
 const defaultLocalStorage = window.localStorage;
 const defaultCookieStore = Cookies;
-const defaultConfig = {
+const defaultGetConfig = () => ({
   APP_INSTANCE_ID: 'app-id',
   FEATURE: {
     CHECK_CONSENT: true,
@@ -52,24 +53,31 @@ const defaultConfig = {
     ENABLE_SSO: true,
     PERSIST_TEMPORARY_CLIENTS: true,
   },
-};
+});
 
 export const mockStoreFactory = (
   parameters: MockStoreParameters = {
     actions: defaultActions,
     apiClient: defaultClient,
-    config: defaultConfig,
     cookieStore: defaultCookieStore,
     core: defaultCore,
+    getConfig: defaultGetConfig,
     localStorage: defaultLocalStorage,
   },
 ) => {
-  const {actions, apiClient, cookieStore, core, config, localStorage} = parameters;
+  const {actions, apiClient, cookieStore, core, getConfig, localStorage} = parameters;
   if (core) {
     (core as any).apiClient = apiClient;
   }
   return configureStore<TypeUtil.RecursivePartial<RootState>, ThunkDispatch>([
-    thunk.withExtraArgument({actions, apiClient, cookieStore, core, config: config || defaultConfig, localStorage}),
+    thunk.withExtraArgument({
+      actions,
+      apiClient,
+      cookieStore,
+      core,
+      getConfig: getConfig || defaultGetConfig,
+      localStorage,
+    }),
     createLogger({
       actionTransformer(action: any): string {
         return JSON.stringify(action);

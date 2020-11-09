@@ -17,53 +17,62 @@
  *
  */
 
+import {ConversationRole, DefaultConversationRoleName as DefaultRole} from '@wireapp/api-client/src/conversation';
+
 import {createRandomUuid} from 'Util/util';
 
 import {Conversation} from '../entity/Conversation';
 import {User} from '../entity/User';
 import {TeamEntity} from '../team/TeamEntity';
-import {ConversationRoleRepository, ConversationRoles, DefaultRole, Permissions} from './ConversationRoleRepository';
-
-declare global {
-  interface Window {
-    TestFactory: any;
-  }
-}
+import {TestFactory} from '../../../test/helper/TestFactory';
+import {ConversationRoleRepository, Permissions} from './ConversationRoleRepository';
 
 describe('ConversationRoleRepository', () => {
-  const testFactory = new window.TestFactory();
+  const testFactory = new TestFactory();
   let roleRepository: ConversationRoleRepository;
 
   beforeEach(async () => {
     await testFactory.exposeConversationActors();
-    roleRepository = new ConversationRoleRepository(window.TestFactory.conversation_repository);
+    roleRepository = new ConversationRoleRepository(
+      testFactory.team_repository,
+      testFactory.conversation_service,
+      testFactory.user_repository['userState'],
+      testFactory.team_repository['teamState'],
+    );
   });
 
   describe('constructor', () => {
     it('knows if you are in a team', () => {
-      expect(roleRepository.isTeam()).toBe(false);
-      window.TestFactory.team_repository.team(new TeamEntity(createRandomUuid()));
-      expect(roleRepository.isTeam()).toBeTrue();
+      expect(roleRepository['teamState'].isTeam()).toBe(false);
+      testFactory.team_repository['teamState'].team(new TeamEntity(createRandomUuid()));
+
+      expect(roleRepository['teamState'].isTeam()).toBeTrue();
     });
   });
 
   describe('loadTeamRoles', () => {
     it('initializes all team roles', async () => {
-      spyOn(window.TestFactory.team_repository, 'getTeamConversationRoles').and.returnValue(
+      spyOn(testFactory.team_repository, 'getTeamConversationRoles').and.returnValue(
         Promise.resolve({
-          conversation_roles: ['my-custom-role'],
+          conversation_roles: [
+            {
+              actions: [Permissions.leaveConversation],
+              conversation_role: DefaultRole.WIRE_MEMBER,
+            },
+          ],
         }),
       );
 
-      window.TestFactory.team_repository.team(new TeamEntity(createRandomUuid()));
+      testFactory.team_repository['teamState'].team(new TeamEntity(createRandomUuid()));
       await roleRepository.loadTeamRoles();
+
       expect(roleRepository.teamRoles.length).toBe(1);
     });
   });
 
   describe('setConversationRoles', () => {
     it('sets conversation roles', async () => {
-      const newRoles: ConversationRoles = [
+      const newRoles: ConversationRole[] = [
         {
           actions: [Permissions.leaveConversation],
           conversation_role: DefaultRole.WIRE_MEMBER,
@@ -74,6 +83,7 @@ describe('ConversationRoleRepository', () => {
       roleRepository.setConversationRoles(conversationEntity, newRoles);
 
       const realRoles = roleRepository.getConversationRoles(conversationEntity);
+
       expect(realRoles.length).toBe(1);
     });
   });
@@ -85,6 +95,7 @@ describe('ConversationRoleRepository', () => {
       conversationEntity.participating_user_ets.push(userEntity);
 
       let canAddParticipants = roleRepository.canAddParticipants(conversationEntity, userEntity);
+
       expect(canAddParticipants).toBeFalse();
 
       conversationEntity.roles({
@@ -92,6 +103,7 @@ describe('ConversationRoleRepository', () => {
       });
 
       canAddParticipants = roleRepository.canAddParticipants(conversationEntity, userEntity);
+
       expect(canAddParticipants).toBeTrue();
     });
   });

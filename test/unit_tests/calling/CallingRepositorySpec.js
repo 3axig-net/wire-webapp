@@ -17,7 +17,9 @@
  *
  */
 
-import UUID from 'uuidjs';
+import {WebAppEvents} from '@wireapp/webapp-events';
+import {CONV_TYPE, CALL_TYPE, STATE as CALL_STATE, REASON} from '@wireapp/avs';
+
 import {CallingRepository} from 'src/script/calling/CallingRepository';
 import {EventRepository} from 'src/script/event/EventRepository';
 import {Participant} from 'src/script/calling/Participant';
@@ -25,18 +27,24 @@ import {Call} from 'src/script/calling/Call';
 import {User} from 'src/script/entity/User';
 import {MediaType} from 'src/script/media/MediaType';
 import {Conversation} from 'src/script/entity/Conversation';
-import {CONV_TYPE, CALL_TYPE, STATE as CALL_STATE, REASON} from '@wireapp/avs';
-import {WebAppEvents} from 'src/script/event/WebApp';
 import {ModalsViewModel} from 'src/script/view_model/ModalsViewModel';
 import {serverTimeHandler} from 'src/script/time/serverTimeHandler';
+import {TestFactory} from '../../helper/TestFactory';
+import {createRandomUuid} from 'Util/util';
+
+const createSelfParticipant = () => {
+  const selfUser = new User();
+  selfUser.isMe = true;
+  return new Participant(selfUser);
+};
 
 describe('CallingRepository', () => {
   const testFactory = new TestFactory();
   let callingRepository;
   let wCall;
   let wUser;
-  const selfUser = new User(genUUID());
-  const clientId = genUUID();
+  const selfUser = new User(createRandomUuid());
+  const clientId = createRandomUuid();
 
   beforeAll(() => {
     return testFactory.exposeCallingActors().then(injectedCallingRepository => {
@@ -58,11 +66,17 @@ describe('CallingRepository', () => {
 
   describe('startCall', () => {
     it('warns the user that there is an ongoing call before starting a new one', done => {
-      const activeCall = new Call(selfUser.id, genUUID(), CONV_TYPE.ONEONONE, new Participant(), CALL_TYPE.NORMAL);
+      const activeCall = new Call(
+        selfUser.id,
+        createRandomUuid(),
+        CONV_TYPE.ONEONONE,
+        new Participant(),
+        CALL_TYPE.NORMAL,
+      );
       activeCall.state(CALL_STATE.MEDIA_ESTAB);
       spyOn(callingRepository, 'activeCalls').and.returnValue([activeCall]);
       spyOn(amplify, 'publish').and.returnValue(undefined);
-      const conversationId = genUUID();
+      const conversationId = createRandomUuid();
       const conversationType = CONV_TYPE.ONEONONE;
       const callType = CALL_TYPE.NORMAL;
       spyOn(wCall, 'start');
@@ -80,7 +94,7 @@ describe('CallingRepository', () => {
     });
 
     it('starts a normal call in a 1:1 conversation', () => {
-      const conversationId = genUUID();
+      const conversationId = createRandomUuid();
       const conversationType = CONV_TYPE.ONEONONE;
       const callType = CALL_TYPE.NORMAL;
       spyOn(wCall, 'start');
@@ -92,13 +106,14 @@ describe('CallingRepository', () => {
 
   describe('joinedCall', () => {
     it('only exposes the current active call', () => {
-      const incomingCall = new Call();
+      const selfParticipant = createSelfParticipant();
+      const incomingCall = new Call('', '', undefined, selfParticipant);
       incomingCall.state(CALL_STATE.INCOMING);
 
-      const activeCall = new Call();
+      const activeCall = new Call('', '', undefined, selfParticipant);
       activeCall.state(CALL_STATE.MEDIA_ESTAB);
 
-      const declinedCall = new Call();
+      const declinedCall = new Call('', '', undefined, selfParticipant);
       declinedCall.state(CALL_STATE.INCOMING);
       declinedCall.reason(REASON.STILL_ONGOING);
 
@@ -109,13 +124,13 @@ describe('CallingRepository', () => {
   });
 
   describe('getCallMediaStream', () => {
-    it('return cached mediastream for self user if set', () => {
-      const call = new Call();
+    it('returns cached mediastream for self user if set', () => {
+      const selfParticipant = createSelfParticipant();
+      const call = new Call('', '', undefined, selfParticipant);
       const audioTrack = silence();
       const selfMediaStream = new MediaStream([audioTrack]);
-      call.selfParticipant = new Participant();
-      call.selfParticipant.audioStream(selfMediaStream);
-      spyOn(call.selfParticipant, 'getMediaStream').and.callThrough();
+      selfParticipant.audioStream(selfMediaStream);
+      spyOn(selfParticipant, 'getMediaStream').and.callThrough();
       spyOn(callingRepository, 'findCall').and.returnValue(call);
 
       const queries = [1, 2, 3, 4].map(() => {
@@ -124,15 +139,15 @@ describe('CallingRepository', () => {
         });
       });
       return Promise.all(queries).then(() => {
-        expect(call.selfParticipant.getMediaStream).toHaveBeenCalledTimes(queries.length);
+        expect(selfParticipant.getMediaStream).toHaveBeenCalledTimes(queries.length);
       });
     });
 
-    it('ask only once for mediastream when queried multiple times', () => {
-      const call = new Call();
+    it('asks only once for mediastream when queried multiple times', () => {
+      const selfParticipant = createSelfParticipant();
+      const call = new Call('', '', undefined, selfParticipant);
       const audioTrack = silence();
       const selfMediaStream = new MediaStream([audioTrack]);
-      call.selfParticipant = new Participant();
       spyOn(callingRepository.mediaStreamHandler, 'requestMediaStream').and.returnValue(
         Promise.resolve(selfMediaStream),
       );
@@ -150,8 +165,8 @@ describe('CallingRepository', () => {
   });
 
   describe('stopMediaSource', () => {
-    it('release media streams', () => {
-      const selfParticipant = new Participant();
+    it('releases media streams', () => {
+      const selfParticipant = createSelfParticipant();
       spyOn(selfParticipant, 'releaseAudioStream');
       spyOn(selfParticipant, 'releaseVideoStream');
       const call = new Call('', '', 0, selfParticipant, 0);
@@ -168,31 +183,10 @@ describe('CallingRepository', () => {
     });
   });
 
-  describe('changeMediaSource', () => {
-    it('changes active call sent media streams', () => {
-      spyOn(callingRepository.wCall, 'replaceTrack');
-      const selfParticipant = new Participant();
-      spyOn(selfParticipant, 'releaseStream');
-      spyOn(selfParticipant, 'sharesCamera').and.returnValue(true);
-      const call = new Call('', '', 0, selfParticipant, 0);
-      const newMediaStream = new MediaStream();
-
-      callingRepository.changeMediaSource(newMediaStream, MediaType.AUDIO, call);
-
-      expect(selfParticipant.releaseStream).toHaveBeenCalledTimes(1);
-      expect(callingRepository.wCall.replaceTrack).toHaveBeenCalledTimes(1);
-
-      callingRepository.changeMediaSource(newMediaStream, MediaType.VIDEO, call);
-
-      expect(selfParticipant.releaseStream).toHaveBeenCalledTimes(2);
-      expect(callingRepository.wCall.replaceTrack).toHaveBeenCalledTimes(2);
-    });
-  });
-
   describe('incoming call', () => {
-    it('create a stores a new call when an incoming call arrives', done => {
-      spyOn(callingRepository.conversationRepository, 'grantMessage').and.returnValue(Promise.resolve());
-      spyOn(callingRepository.conversationRepository, 'find_conversation_by_id').and.returnValue(new Conversation());
+    it('creates and stores a new call when an incoming call arrives', done => {
+      spyOn(callingRepository.messageRepository, 'grantMessage').and.returnValue(Promise.resolve());
+      spyOn(callingRepository.conversationState, 'findConversation').and.returnValue(new Conversation());
       const event = {
         content: {
           props: {
@@ -227,16 +221,18 @@ describe('CallingRepository', () => {
   });
 });
 
-describe('e2e audio call', () => {
+xdescribe('E2E audio call', () => {
   const conversationRepository = {
     find_conversation_by_id: () => new Conversation(),
+  };
+  const messageRepository = {
     grantMessage: () => Promise.resolve(true),
   };
   const eventRepository = {injectEvent: () => {}};
 
   const client = new CallingRepository(
-    undefined,
     conversationRepository,
+    messageRepository,
     eventRepository,
     undefined,
     serverTimeHandler,
@@ -346,10 +342,6 @@ describe('e2e audio call', () => {
   });
 });
 
-function genUUID() {
-  return UUID.genV4().hexString;
-}
-
 function silence() {
   const ctx = new AudioContext();
   const oscillator = ctx.createOscillator();
@@ -376,8 +368,8 @@ function extractAudioStats(stats) {
 }
 
 function createAutoAnsweringWuser(wCall, remoteCallingRepository) {
-  const selfUserId = genUUID();
-  const selfClientId = genUUID();
+  const selfUserId = createRandomUuid();
+  const selfClientId = createRandomUuid();
   const sendMsg = (context, conversationId, userId, clientId, destinationUserId, destinationClientId, payload) => {
     const event = {
       content: JSON.parse(payload),
@@ -400,17 +392,17 @@ function createAutoAnsweringWuser(wCall, remoteCallingRepository) {
   const wUser = wCall.create(
     selfUserId,
     selfClientId,
-    () => {}, //readyh,
-    sendMsg, //sendh,
-    incoming, //incomingh,
-    () => {}, //missedh,
-    () => {}, //answerh,
-    () => {}, //estabh,
-    () => {}, //closeh,
-    () => {}, //metricsh,
-    requestConfig, //cfg_reqh,
-    () => {}, //acbrh,
-    () => {}, //vstateh,
+    () => {}, // `readyh`,
+    sendMsg, // `sendh`,
+    incoming, // `incomingh`,
+    () => {}, // `missedh`,
+    () => {}, // `answerh`,
+    () => {}, // `estabh`,
+    () => {}, // `closeh`,
+    () => {}, // `metricsh`,
+    requestConfig, // `cfg_reqh`,
+    () => {}, // `acbrh`,
+    () => {}, // `vstateh`,
     0,
   );
   return wUser;

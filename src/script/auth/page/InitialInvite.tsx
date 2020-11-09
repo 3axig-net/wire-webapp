@@ -22,7 +22,6 @@ import {
   COLOR,
   CheckIcon,
   ContainerXS,
-  ErrorMessage,
   Form,
   H1,
   Input,
@@ -46,9 +45,9 @@ import {RootState, bindActionCreators} from '../module/reducer';
 import * as AuthSelector from '../module/selector/AuthSelector';
 import * as InviteSelector from '../module/selector/InviteSelector';
 import * as LanguageSelector from '../module/selector/LanguageSelector';
-import {parseError, parseValidationErrors} from '../util/errorUtil';
 import {pathWithParams} from '../util/urlUtil';
 import Page from './Page';
+import Exception from '../component/Exception';
 
 interface Props extends React.HTMLProps<HTMLDivElement> {}
 
@@ -172,9 +171,7 @@ const InitialInvite = ({
               </RoundIconButton>
             </InputSubmitCombo>
           </Form>
-          <ErrorMessage data-uie-name="error-message">
-            {error ? parseValidationErrors(error) : parseError(inviteError)}
-          </ErrorMessage>
+          <Exception errors={[error, inviteError]} />
         </div>
         <div>
           {invites.length ? (

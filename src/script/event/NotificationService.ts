@@ -17,19 +17,22 @@
  *
  */
 
-import {CONVERSATION_EVENT} from '@wireapp/api-client/dist/event';
-import {Notification, NotificationList} from '@wireapp/api-client/dist/notification';
-import {DatabaseKeys} from '@wireapp/core/dist/notification/NotificationDatabaseRepository';
+import type {NotificationList} from '@wireapp/api-client/src/notification/';
+import {CONVERSATION_EVENT} from '@wireapp/api-client/src/event';
+import type {Notification} from '@wireapp/api-client/src/notification';
+import {DatabaseKeys} from '@wireapp/core/src/main/notification/NotificationDatabaseRepository';
+import {container} from 'tsyringe';
+
 import {Logger, getLogger} from 'Util/Logger';
+
 import {EventRecord, StorageSchemata, StorageService} from '../storage/';
+import {EventError} from '../error/EventError';
+import {APIClient} from '../service/APIClientSingleton';
 
 export class NotificationService {
-  private readonly backendClient: any;
   private readonly logger: Logger;
-  private readonly storageService: StorageService;
   private readonly AMPLIFY_STORE_NAME: string;
 
-  // tslint:disable-next-line:typedef
   static get CONFIG() {
     return {
       PRIMARY_KEY_MISSED: 'z.storage.StorageKey.NOTIFICATION.MISSED',
@@ -38,68 +41,43 @@ export class NotificationService {
     };
   }
 
-  constructor(backendClient: any, storageService: StorageService) {
-    this.backendClient = backendClient;
-    this.storageService = storageService;
+  constructor(
+    private readonly storageService = container.resolve(StorageService),
+    private readonly apiClient = container.resolve(APIClient),
+  ) {
     this.logger = getLogger('NotificationService');
     this.AMPLIFY_STORE_NAME = StorageSchemata.OBJECT_STORE.AMPLIFY;
   }
 
   /**
    * Get events from the notification stream.
-   * @param clientId - Only return notifications targeted at the given client
-   * @param notificationId - Only return notifications more recent than the given event ID (like
+   * @param clientId Only return notifications targeted at the given client
+   * @param notificationId Only return notifications more recent than the given event ID (like
    *   "7130304a-c839-11e5-8001-22000b0fe035")
-   * @param size - Maximum number of notifications to return
+   * @param size Maximum number of notifications to return
    * @returns Resolves with a pages list of notifications
    */
   getNotifications(clientId?: string, notificationId?: string, size: number = 10000): Promise<NotificationList> {
-    return this.backendClient.sendRequest({
-      data: {
-        client: clientId,
-        since: notificationId,
-        size: size,
-      },
-      type: 'GET',
-      url: NotificationService.CONFIG.URL_NOTIFICATIONS,
-    });
+    return this.apiClient.notification.api.getNotifications(clientId, size, notificationId);
   }
 
   async getServerTime(): Promise<string> {
     // Info: We use "100" as size limit because it's the minimum value accepted by the backend's notification stream
-    const notificationList = await this.getNotifications(undefined, undefined, 100);
+    const notificationList = await this.apiClient.notification.api.getNotifications(undefined, 100, undefined);
     return notificationList.time;
   }
 
   getAllNotificationsForClient(clientId: string, notificationId?: string): Promise<Notification[]> {
-    const notifications: Notification[] = [];
-
-    const collectNotifications = async (lastNotificationId?: string): Promise<Notification[]> => {
-      const notificationList = await this.getNotifications(clientId, lastNotificationId);
-      const newNotifications = notificationList.notifications;
-      if (newNotifications.length > 0) {
-        lastNotificationId = newNotifications[newNotifications.length - 1].id;
-        notifications.push(...newNotifications);
-      }
-      return notificationList.has_more ? collectNotifications(lastNotificationId) : notifications;
-    };
-
-    return collectNotifications(notificationId);
+    return this.apiClient.notification.api.getAllNotifications(clientId, notificationId);
   }
 
   /**
    * Get the last notification for a given client.
-   * @param clientId - Only return notifications targeted at the given client
+   * @param clientId Only return notifications targeted at the given client
    * @returns Resolves with the last known notification for given client
    */
   getNotificationsLast(clientId: string): Promise<Notification> {
-    return this.backendClient.sendRequest({
-      data: {
-        client: clientId,
-      },
-      type: 'GET',
-      url: NotificationService.CONFIG.URL_NOTIFICATIONS_LAST,
-    });
+    return this.apiClient.notification.api.getLastNotification(clientId);
   }
 
   /**
@@ -111,13 +89,13 @@ export class NotificationService {
       .load<{value: string}>(this.AMPLIFY_STORE_NAME, DatabaseKeys.PRIMARY_KEY_LAST_EVENT)
       .catch(error => {
         this.logger.error(`Failed to get last event timestamp from storage: ${error.message}`, error);
-        throw new z.error.EventError(z.error.EventError.TYPE.DATABASE_FAILURE);
+        throw new EventError(EventError.TYPE.DATABASE_FAILURE, EventError.MESSAGE.DATABASE_FAILURE);
       })
       .then(record => {
         if (record?.value) {
           return record.value;
         }
-        throw new z.error.EventError(z.error.EventError.TYPE.NO_LAST_DATE);
+        throw new EventError(EventError.TYPE.NO_LAST_DATE, EventError.MESSAGE.NO_LAST_DATE);
       });
   }
 
@@ -130,19 +108,19 @@ export class NotificationService {
       .load<{value: string}>(this.AMPLIFY_STORE_NAME, DatabaseKeys.PRIMARY_KEY_LAST_NOTIFICATION)
       .catch(error => {
         this.logger.error(`Failed to get last notification ID from storage: ${error.message}`, error);
-        throw new z.error.EventError(z.error.EventError.TYPE.DATABASE_FAILURE);
+        throw new EventError(EventError.TYPE.DATABASE_FAILURE, EventError.MESSAGE.DATABASE_FAILURE);
       })
       .then(record => {
         if (record?.value) {
           return record.value;
         }
-        throw new z.error.EventError(z.error.EventError.TYPE.NO_LAST_ID);
+        throw new EventError(EventError.TYPE.NO_LAST_ID, EventError.MESSAGE.NO_LAST_ID);
       });
   }
 
   /**
    * Load missed ID from persistent storage.
-   * @returns {Promise} Resolves with the stored missed ID.
+   * @returns Resolves with the stored missed ID.
    */
   getMissedIdFromDb(): Promise<string | undefined> {
     return this.storageService
@@ -157,7 +135,7 @@ export class NotificationService {
 
   /**
    * Save last event date to persistent storage.
-   * @param eventDate - Event date (in ISO 8601) to be stored
+   * @param eventDate Event date (in ISO 8601) to be stored
    * @returns Resolves with the primary key of the stored record
    */
   saveLastEventDateToDb(eventDate: string): Promise<string> {
@@ -168,7 +146,7 @@ export class NotificationService {
 
   /**
    * Save last notification ID to persistent storage.
-   * @param notificationId - Notification ID to be stored
+   * @param notificationId Notification ID to be stored
    * @returns Resolves with the primary key of the stored record
    */
   saveLastNotificationIdToDb(notificationId: string): Promise<string> {
@@ -179,7 +157,7 @@ export class NotificationService {
 
   /**
    * Save missed notifications ID to persistent storage.
-   * @param notificationId - Notification ID to be stored
+   * @param notificationId Notification ID to be stored
    * @returns Resolves with the primary key of the stored record
    */
   saveMissedIdToDb(notificationId: string): Promise<string> {
@@ -195,13 +173,10 @@ export class NotificationService {
       const events = await this.storageService.getAll<EventRecord>(StorageSchemata.OBJECT_STORE.EVENTS);
       message = Object.values(events).filter(event => event.id === messageId)[0];
     } else {
-      message = await this.storageService.db
-        .table(StorageSchemata.OBJECT_STORE.EVENTS)
-        .where({id: messageId})
-        .first();
+      message = await this.storageService.db.table(StorageSchemata.OBJECT_STORE.EVENTS).where({id: messageId}).first();
     }
 
-    const {notifications} = await this.getNotifications(clientId);
+    const {notifications} = await this.apiClient.notification.api.getNotifications(clientId);
 
     for (const notification of notifications) {
       const matchedEvent = notification.payload.find(event => {

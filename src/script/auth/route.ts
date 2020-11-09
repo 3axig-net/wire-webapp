@@ -18,11 +18,14 @@
  */
 
 export const QUERY_KEY = {
+  ACCOUNT_ID: 'id', // account ID passed from the wrapper to the webview
   APPLOCK_SCHEDULED_TIMEOUT: 'applock_scheduled_timeout',
   APPLOCK_UNFOCUS_TIMEOUT: 'applock_unfocus_timeout',
+  CLIENT_TYPE: 'clienttype',
   CONVERSATION_CODE: 'join_code',
   CONVERSATION_KEY: 'join_key',
   CURRENCY: 'currency',
+  DESTINATION_URL: 'destination_url',
   ENVIRONMENT: 'env',
   IMMEDIATE_LOGIN: 'immediate_login',
   JOIN_EXPIRES: 'expires_in',
@@ -31,10 +34,12 @@ export const QUERY_KEY = {
   LOGOUT_REASON: 'reason',
   PERSIST_TEMPORARY_CLIENTS: 'persist_temporary_clients',
   PWA_AWARE: 'pwa_aware',
+  SSO_AUTO_LOGIN: 'sso_auto_login',
   TRACKING: 'tracking',
 };
 
 export const FORWARDED_QUERY_KEYS = [
+  QUERY_KEY.ACCOUNT_ID,
   QUERY_KEY.APPLOCK_SCHEDULED_TIMEOUT,
   QUERY_KEY.APPLOCK_UNFOCUS_TIMEOUT,
   QUERY_KEY.ENVIRONMENT,
@@ -57,15 +62,17 @@ export const ROUTE = {
   CREATE_ACCOUNT: '/createaccount',
   CREATE_TEAM: '/createteam',
   CREATE_TEAM_ACCOUNT: '/createteamaccount',
+  CUSTOM_ENV_REDIRECT: '/custom-env-redirect',
   HISTORY_INFO: '/historyinfo',
   INDEX: '/',
   INITIAL_INVITE: '/teaminvite',
   LOGIN: '/login',
   LOGIN_PHONE: '/phonelogin',
+  SET_ACCOUNT_TYPE: '/setaccounttype',
   SET_EMAIL: '/setemail',
   SET_HANDLE: '/sethandle',
   SET_PASSWORD: '/setpassword',
-  SSO: '/sso/:code?',
+  SSO: '/sso',
   VERIFY_EMAIL_CODE: '/verifyemailcode',
   VERIFY_EMAIL_LINK: '/verifyemaillink',
   VERIFY_PHONE_CODE: '/verifyphonecode',
