@@ -1091,10 +1091,10 @@ electron-serve@1.1.0:
   resolved "https://registry.yarnpkg.com/electron-serve/-/electron-serve-1.1.0.tgz#507f56c8512c501880d3a9bec792fa92512af378"
   integrity sha512-tQJBCbXKoKCfkBC143QCqnEtT1s8dNE2V+b/82NF6lxnGO/2Q3a3GSLHtKl3iEDQgdzTf9pH7p418xq2rXbz1Q==
 
-electron@11.3.0:
-  version "11.3.0"
-  resolved "https://registry.yarnpkg.com/electron/-/electron-11.3.0.tgz#87e8528fd23ae53b0eeb3a738f1fe0a3ad27c2db"
-  integrity sha512-MhdS0gok3wZBTscLBbYrOhLaQybCSAfkupazbK1dMP5c+84eVMxJE/QGohiWQkzs0tVFIJsAHyN19YKPbelNrQ==
+electron@11.4.11:
+  version "11.4.11"
+  resolved "https://registry.yarnpkg.com/electron/-/electron-11.4.11.tgz#27091dcd54d28539b492d011b0ed3aef7d69cb60"
+  integrity sha512-DyarEH2IJpx5KfE42vF+uq7jyfHDrDRUsXXZyc69tR/GOO0DGuFE6/BHlTaywgPbCS4Sa5/ffEGlG6xq9+eRAQ==
   dependencies:
     "@electron/get" "^1.0.1"
     "@types/node" "^12.0.12"
