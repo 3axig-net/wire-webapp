@@ -2830,10 +2830,10 @@
   resolved "https://registry.yarnpkg.com/@wireapp/lru-cache/-/lru-cache-3.7.12.tgz#1a26775230a2e163edd9cd3b34a341874bb7d817"
   integrity sha512-51kGOfLqWayTf+wlFXCkfOm/HnjZgrGNYzIDYCn0luHhgOWLxTSqr18J1t223phe4Z6h168wTNSzsUlQjEsZpw==
 
-"@wireapp/prettier-config@0.3.0":
-  version "0.3.0"
-  resolved "https://registry.yarnpkg.com/@wireapp/prettier-config/-/prettier-config-0.3.0.tgz#e8129b31021c81d90d564d9c4ff0f7f7b514e943"
-  integrity sha512-BFokvX4NZlkhWq5/OoJUCS8Iels+MeRgzpd5V9QR3hj5swwCFGxJOAL7soPXkSNWo91gI1qwiTp8szB1O9aCfQ==
+"@wireapp/prettier-config@0.4.6":
+  version "0.4.6"
+  resolved "https://registry.yarnpkg.com/@wireapp/prettier-config/-/prettier-config-0.4.6.tgz#fc9ee13be1c2581dd11f452b9d0570276443d46d"
+  integrity sha512-gXT2J48yfwLQGpuK1ScwBFvD4l4ItGfkA03XL3duu3jdvMm9sd6U/HMaQKWnMzuFu5sjR5vS7/U/mCUE2WqISQ==
 
 "@wireapp/priority-queue@1.6.24":
   version "1.6.24"
