@@ -2875,12 +2875,12 @@
     emotion-theming "10.0.27"
     react-transition-group "4.4.1"
 
-"@wireapp/store-engine-dexie@1.3.33":
-  version "1.3.33"
-  resolved "https://registry.yarnpkg.com/@wireapp/store-engine-dexie/-/store-engine-dexie-1.3.33.tgz#ce7d0496103ff8262ad264a9f8c2f8253ebe450d"
-  integrity sha512-c6KguwFQgUsJxQc8pE4r7G6Lpg/wE8Zu0D5v83yx8LRtN09XJyOLc4xupCG9nxRnx9lk72KLBR0xT+gT/Cpj7w==
+"@wireapp/store-engine-dexie@1.7.11":
+  version "1.7.11"
+  resolved "https://registry.yarnpkg.com/@wireapp/store-engine-dexie/-/store-engine-dexie-1.7.11.tgz#4e8f5046dda52fb06197ad28d87199631b106a37"
+  integrity sha512-Y7FV+OxVTsNqJinOxYTSRLwQQTjKmiNfed5LoYJGXxj6VnG599rhJOY+/FqaqdCIsQzrnD/2Q6jCuk8PvlXbOA==
   dependencies:
-    dexie "3.0.3"
+    dexie "3.2.2"
 
 "@wireapp/store-engine-sqleet@1.3.44":
   version "1.3.44"
@@ -4984,7 +4984,12 @@ dexie-batch@0.4.2:
   resolved "https://registry.yarnpkg.com/dexie-batch/-/dexie-batch-0.4.2.tgz#8e457d7eb3da933802eae561e9f0141c9d84b2f9"
   integrity sha512-tDEVCArDddWtSq8EnRovbxw4CBQaBxABMFzahbI8+C6oWMG4yu0DZjMhC3kzdDjz39PIlz75/wuBHk5lgrDiTw==
 
-dexie@3.0.3, dexie@latest:
+dexie@3.2.2:
+  version "3.2.2"
+  resolved "https://registry.yarnpkg.com/dexie/-/dexie-3.2.2.tgz#fa6f2a3c0d6ed0766f8d97a03720056f88fe0e01"
+  integrity sha512-q5dC3HPmir2DERlX+toCBbHQXW5MsyrFqPFcovkH9N2S/UW/H3H5AWAB6iEOExeraAu+j+zRDG+zg/D7YhH0qg==
+
+dexie@latest:
   version "3.0.3"
   resolved "https://registry.yarnpkg.com/dexie/-/dexie-3.0.3.tgz#ede63849dfe5f07e13e99bb72a040e8ac1d29dab"
   integrity sha512-BSFhGpngnCl1DOr+8YNwBDobRMH0ziJs2vts69VilwetHYOtEDcLqo7d/XiIphM0tJZ2rPPyAGd31lgH2Ln3nw==
