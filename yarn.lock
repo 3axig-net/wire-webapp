@@ -2249,6 +2249,11 @@
   resolved "https://registry.yarnpkg.com/@types/node/-/node-13.13.4.tgz#1581d6c16e3d4803eb079c87d4ac893ee7501c2c"
   integrity sha512-x26ur3dSXgv5AwKS0lNfbjpCakGIduWU1DU91Zz58ONRWrIKGunmZBNv4P7N+e27sJkiGDsw/3fT4AtsqQBrBA==
 
+"@types/node@>=13.7.0":
+  version "18.11.3"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.11.3.tgz#78a6d7ec962b596fc2d2ec102c4dd3ef073fea6a"
+  integrity sha512-fNjDQzzOsZeKZu5NATgXUPsaFaTxeRgFXoosrHivTl8RGeV733OLawXsGfEk9a8/tySyZUyiZ6E8LcjPFZ2y1A==
+
 "@types/node@^13.7.0":
   version "13.13.39"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-13.13.39.tgz#237d071fb593d3aaa96f655a8eb2f91e0fb1480c"
@@ -2861,6 +2866,13 @@
   integrity sha512-mej3JlFKRLgaMFqVlKhSqXdoPchd7XAwEpu9kTbvUB5MPF6cPK/Thmxfs4CVb4gPmG3wGW6sK3cTNfTYMpIwYw==
   dependencies:
     protobufjs "6.10.2"
+
+"@wireapp/protocol-messaging@1.39.0":
+  version "1.39.0"
+  resolved "https://registry.yarnpkg.com/@wireapp/protocol-messaging/-/protocol-messaging-1.39.0.tgz#fd7bde3c7ce2fa2fbf6eab22204bf7a1dd94db8f"
+  integrity sha512-YnujFidZco3tlFLqmYfK7ZQzE+9QIoMOCDJrTzCCSqFYQnn9BeyQp8868TnVPTX5tRyL4IHx47bqQ/FJBBOQAA==
+  dependencies:
+    protobufjs "6.11.3"
 
 "@wireapp/react-ui-kit@7.44.7":
   version "7.44.7"
@@ -10940,6 +10952,25 @@ protobufjs@6.10.2:
     "@protobufjs/utf8" "^1.1.0"
     "@types/long" "^4.0.1"
     "@types/node" "^13.7.0"
+    long "^4.0.0"
+
+protobufjs@6.11.3:
+  version "6.11.3"
+  resolved "https://registry.yarnpkg.com/protobufjs/-/protobufjs-6.11.3.tgz#637a527205a35caa4f3e2a9a4a13ddffe0e7af74"
+  integrity sha512-xL96WDdCZYdU7Slin569tFX712BxsxslWwAfAhCYjQKGTq7dAU91Lomy6nLLhh/dyGhk/YH4TwTSRxTzhuHyZg==
+  dependencies:
+    "@protobufjs/aspromise" "^1.1.2"
+    "@protobufjs/base64" "^1.1.2"
+    "@protobufjs/codegen" "^2.0.4"
+    "@protobufjs/eventemitter" "^1.1.0"
+    "@protobufjs/fetch" "^1.1.0"
+    "@protobufjs/float" "^1.0.2"
+    "@protobufjs/inquire" "^1.1.0"
+    "@protobufjs/path" "^1.1.2"
+    "@protobufjs/pool" "^1.1.0"
+    "@protobufjs/utf8" "^1.1.0"
+    "@types/long" "^4.0.1"
+    "@types/node" ">=13.7.0"
     long "^4.0.0"
 
 prr@~1.0.1:
