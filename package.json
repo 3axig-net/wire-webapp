@@ -145,7 +145,7 @@
     "less": "3.13.1",
     "lint-staged": "10.5.4",
     "load-grunt-tasks": "5.1.0",
-    "node-fetch": "2.6.1",
+    "node-fetch": "3.3.0",
     "node-sass": "5.0.0",
     "node-webcrypto-ossl": "2.1.2",
     "os-browserify": "0.3.0",
