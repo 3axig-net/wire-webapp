@@ -10,7 +10,7 @@
     "cpx": "1.5.0",
     "electron": "11.3.0",
     "electron-builder": "22.10.5",
-    "globby": "11.0.2",
+    "globby": "13.1.3",
     "rimraf": "3.0.2",
     "ts-node": "9.1.1",
     "typescript": "4.2.3"
